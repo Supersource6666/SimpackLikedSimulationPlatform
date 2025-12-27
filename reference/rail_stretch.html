@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 钢轨拉伸演示</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+        
+        // 将THREE和相关类暴露到全局作用域
+        window.THREE = THREE;
+        window.OrbitControls = OrbitControls;
+        window.GLTFExporter = GLTFExporter;
+    </script>
+    <style>
+        body { margin: 0; background: #f5f5f5; }
+        canvas { display: block; }
+        #exportBtn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 1000;
+        }
+        #exportBtn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <!-- <button id="exportBtn">导出GLB模型</button> -->
+    <div id="profileContainer" style="position: absolute; top: 10px; right: 10px; background: white; padding: 8px; border: 1px solid #ccc; border-radius: 4px; z-index: 1000;">
+        <h4 style="margin: 5px 0; font-size: 14px;">钢轨断面廓形</h4>
+        <canvas id="profileCanvas" width="150" height="210" style="border: 1px solid #eee;"></canvas>
+    </div>
+    <div id="thumbnailContainer" style="position: absolute; top: 50px; left: 10px; background: white; padding: 8px; border: 1px solid #ccc; border-radius: 4px; z-index: 1000;">
+        <h4 style="margin: 5px 0; font-size: 14px;">钢轨路径缩略图</h4>
+        <canvas id="thumbnailCanvas" width="200" height="150" style="border: 1px solid #eee;"></canvas>
+    </div>
+<!-- 移除了跟随模式相关的UI元素 -->
+    <script type="module">
+        // 初始化场景、相机和渲染器
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf5f5f5);
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera.position.set(50, 50, 100); // 调整相机位置以便更好地查看场景
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        // 添加坐标轴辅助 - 增加长度使其更明显
+        const axesHelper = new THREE.AxesHelper(50); // 长度为50的坐标轴，在大型场景中更明显
+        scene.add(axesHelper);
+        
+        // 添加原点标记 - 保持红色，大小适中
+        const originGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const originMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const originMarker = new THREE.Mesh(originGeometry, originMaterial);
+        scene.add(originMarker);
+        
+        // 添加轨道控制器
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // 添加光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(15, 30, 15);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+        
+        // 添加XOY平面地面
+        const groundGeometry = new THREE.PlaneGeometry(1000, 1000); // 扩大地面尺寸以匹配轨道范围
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        // 平面默认在XOY平面内，不需要旋转
+        ground.position.z = -0.5; // 稍微向下偏移，避免与钢轨重叠
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // 创建钢轨2D轮廓
+        function createRailProfile() {
+            // 60kg/m钢轨核心尺寸（单位：米，保留关键参数）
+            const railHeight = 0.176;      // 钢轨总高度176mm
+            const halfTopWidth = 0.0708 / 2; // 轨头顶部半宽35.4mm
+            const halfBottomWidth = 0.150 / 2; // 轨底半宽75mm
+            const webHalfThickness = 0.0165 / 2; // 轨腰半厚8.25mm
+            // 关键圆角半径（保留核心圆角，移除次要过渡圆角）
+            const r13 = 0.013; // 轨头圆角R13mm
+            const r20 = 0.020; // 轨底圆角R20mm
+                
+            const points = [];
+            // 关键Y坐标（以中心为原点，向上为正）
+            const headTopY = railHeight / 2; // 轨头顶部Y：0.088m
+            const headBottomY = headTopY - 0.0483; // 轨头底部Y：0.0397m
+            const baseBottomY = -railHeight / 2; // 轨底底部Y：-0.088m
+            const webBottomY = baseBottomY + 0.0305; // 轨腰底部Y：-0.0575m
+                
+            // ===================== 右侧轮廓（从轨头到轨底） =====================
+            // 1. 轨头顶部右侧点
+            points.push(new THREE.Vector2(halfTopWidth, headTopY));
+                
+            // 2. 轨头右侧圆角（R13，简化为单段圆弧，减少循环步数）
+            const headRightCenter = new THREE.Vector2(halfTopWidth, headTopY - r13);
+            for (let angle = Math.PI / 2; angle >= 0; angle -= 0.1) { // 步长加大，减少点数量
+                points.push(new THREE.Vector2(
+                    headRightCenter.x + r13 * Math.cos(angle),
+                    headRightCenter.y + r13 * Math.sin(angle)
+                ));
+            }
+        
+            // 3. 轨头到轨腰的右侧斜面（简化为直接连接关键端点，移除细分）
+            points.push(new THREE.Vector2(0.03325, headBottomY)); // 斜面终点
+            points.push(new THREE.Vector2(webHalfThickness, webBottomY)); // 轨腰右侧点
+        
+            // 4. 轨底右侧圆角（R20，改变凹凸方向）
+            // const baseRightCenter = new THREE.Vector2(webHalfThickness, webBottomY + r20);
+            // for (let angle = 0; angle <= Math.PI / 2; angle += 0.1) {
+            //     points.push(new THREE.Vector2(
+            //         baseRightCenter.x + r20 * Math.cos(angle),
+            //         baseRightCenter.y - r20 * Math.sin(angle)
+            //     ));
+            // }
+        
+            // 5. 轨底右侧到底部点（简化斜面为直接连接）
+            points.push(new THREE.Vector2(halfBottomWidth, baseBottomY));
+        
+            // ===================== 左侧轮廓（对称复制右侧，减少重复代码） =====================
+            // 反转右侧点的X坐标，生成左侧轮廓（从轨底到轨头）
+            const rightPointsCount = points.length;
+            for (let i = rightPointsCount - 1; i >= 0; i--) {
+                const p = points[i];
+                points.push(new THREE.Vector2(-p.x, p.y));
+            }
+        
+            return points;
+        }
+        
+        // 轨道线路数据 - 直线-曲线-直线结构，包含直线段、缓和曲线和圆曲线
+
+
+
+        // 创建轨道路径 - 通用函数，可以创建不同的轨道
+        function createTrackPath(options = {}) {
+            const {
+                startPosition = new THREE.Vector3(0, 0, 0),
+                curveRadius = 200,
+                transitionLength = 50,
+                railName = "直线-曲线-直线轨道"
+            } = options;
+            
+            const path = new THREE.CurvePath();
+                
+            console.log(`=== 创建${railName} ===`);
+            
+            // 轨道状态
+            let position = startPosition.clone();
+            let heading = 0; // 朝向角（弧度，0 表示 X 正方向）
+                
+            // 直线-曲线-直线轨道结构定义
+            const segments = [
+                // 第一段直线：长度200米
+                { type: 'line', length: 200 },
+                // 第一段缓和曲线：从直线到圆曲线
+                { type: 'transition', length: transitionLength, startRadius: Infinity, endRadius: curveRadius },
+                // 圆曲线：90度转向（π/2弧度）
+                { type: 'arc', radius: curveRadius, angle: Math.PI / 2 },
+                // 最后一段缓和曲线：从圆曲线回到直线
+                { type: 'transition', length: transitionLength, startRadius: curveRadius, endRadius: Infinity },
+                // 第二段直线：长度200米
+                { type: 'line', length: 200 }
+            ];
+                
+            segments.forEach(seg => {
+                if (seg.type === 'line') {
+                    addLine(path, seg.length);
+                }
+                if (seg.type === 'arc') {
+                    addArc(path, seg.radius, seg.angle);
+                }
+                if (seg.type === 'transition') {
+                    addTransition(path, seg.length, seg.startRadius, seg.endRadius);
+                }
+            });
+        
+            // 对于直线-曲线-直线轨道，不需要闭合检查
+            const endPosition = position.clone();
+            const startPositionCopy = startPosition.clone();
+            const distance = endPosition.distanceTo(startPositionCopy);
+            console.log(`轨道起点和终点距离: ${distance.toFixed(4)} 米`);
+            console.log(`轨道起点: (${startPositionCopy.x.toFixed(2)}, ${startPositionCopy.y.toFixed(2)}, ${startPositionCopy.z.toFixed(2)})`);
+            console.log(`轨道终点: (${endPosition.x.toFixed(2)}, ${endPosition.y.toFixed(2)}, ${endPosition.z.toFixed(2)})`);
+        
+            console.log(`${railName}总长度: ${path.getLength().toFixed(2)} 米`);
+            return path;
+        
+            /* ========= 内部函数 ========= */
+        
+            function addLine(path, length) {
+                const start = position.clone();
+                const end = position.clone().add(
+                    new THREE.Vector3(
+                        Math.cos(heading) * length,
+                        Math.sin(heading) * length,
+                        0
+                    )
+                );
+            
+                path.add(new THREE.LineCurve3(start, end));
+                position.copy(end);
+            }
+        
+            function addLineTo(path, targetPosition) {
+                const start = position.clone();
+                const end = targetPosition.clone();
+                const length = start.distanceTo(end);
+                
+                path.add(new THREE.LineCurve3(start, end));
+                position.copy(end);
+                
+                // 更新朝向角
+                heading = Math.atan2(end.y - start.y, end.x - start.x);
+            }
+        
+            function addArc(path, radius, angle) {
+                const segments = 50;
+                const sign = angle > 0 ? 1 : -1;
+                const center = new THREE.Vector3(
+                    position.x - sign * radius * Math.sin(heading),
+                    position.y + sign * radius * Math.cos(heading),
+                    0
+                );
+            
+                let prevPoint = position.clone();
+            
+                for (let i = 1; i <= segments; i++) {
+                    const t = i / segments;
+                    const theta = heading + angle * t;
+                
+                    const point = new THREE.Vector3(
+                        center.x + sign * radius * Math.sin(theta),
+                        center.y - sign * radius * Math.cos(theta),
+                        0
+                    );
+                
+                    path.add(new THREE.LineCurve3(prevPoint, point));
+                    prevPoint = point;
+                }
+            
+                heading += angle;
+                position.copy(prevPoint);
+            }
+        
+            function addTransition(path, length, startRadius, endRadius) {
+                const segments = 50;
+                let prevPoint = position.clone();
+            
+                for (let i = 1; i <= segments; i++) {
+                    const t = i / segments;
+                
+                    // 曲率线性变化（Clothoid 近似）
+                    const radius =
+                        startRadius === Infinity
+                            ? endRadius / t
+                            : endRadius === Infinity
+                            ? startRadius / (1 - t)
+                            : startRadius + (endRadius - startRadius) * t;
+                
+                    const curvature = 1 / radius;
+                    const ds = length / segments;
+                
+                    heading += curvature * ds;
+                
+                    const point = prevPoint.clone().add(
+                        new THREE.Vector3(
+                            Math.cos(heading) * ds,
+                            Math.sin(heading) * ds,
+                            0
+                        )
+                    );
+                
+                    path.add(new THREE.LineCurve3(prevPoint, point));
+                    prevPoint = point;
+                }
+            
+                position.copy(prevPoint);
+            }
+        }
+
+        // 创建偏移轨道路径 - 将基准轨道偏移一定距离创建左右轨道
+        function offsetTrackPath(basePath, offsetDistance) {
+            const offsetPath = new THREE.CurvePath();
+            const segments = 200; // 采样点数量
+            
+            console.log(`=== 创建偏移轨道，偏移距离: ${offsetDistance.toFixed(4)} 米 ===`);
+            
+            // 预计算所有路径点，确保每个点都有效
+            const pathPoints = [];
+            let validPointsCount = 0;
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                try {
+                    const point = basePath.getPoint(t);
+                    if (point && typeof point.clone === 'function') {
+                        pathPoints.push(point);
+                        validPointsCount++;
+                    } else {
+                        console.error(`无效路径点 at t=${t}:`, point);
+                        // 使用默认点
+                        pathPoints.push(new THREE.Vector3(i * 0.1, 0, 0));
+                    }
+                } catch (e) {
+                    console.error(`获取路径点错误 at t=${t}:`, e);
+                    // 使用默认点
+                    pathPoints.push(new THREE.Vector3(i * 0.1, 0, 0));
+                }
+            }
+            
+            console.log(`预计算路径点完成，有效点数量: ${validPointsCount}`);
+            
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                let point = pathPoints[i];
+                
+                // 确保当前点是有效的Vector3对象
+                if (!point || typeof point.clone !== 'function') {
+                    console.error(`无效路径点 at i=${i}:`, point);
+                    point = new THREE.Vector3(i * 0.1, 0, 0); // 使用默认点
+                    // 将修复后的点保存回pathPoints数组，确保后续计算使用正确的点
+                    pathPoints[i] = point;
+                }
+                
+                // 计算切线
+                let tangent;
+                try {
+                    if (segments === 0) {
+                        // 只有一个点的情况
+                        tangent = new THREE.Vector3(1, 0, 0);
+                    } else if (i === 0) {
+                        // 起点：使用下一个点计算切线
+                        let nextPoint = pathPoints[Math.min(i + 1, segments)];
+                        // 确保下一个点是有效的Vector3对象
+                        if (!nextPoint || typeof nextPoint.clone !== 'function') {
+                            console.error(`无效下一个路径点 at i=${i+1}:`, nextPoint);
+                            nextPoint = new THREE.Vector3((i + 1) * 0.1, 0, 0); // 使用默认点
+                            // 将修复后的点保存回pathPoints数组
+                            pathPoints[Math.min(i + 1, segments)] = nextPoint;
+                        }
+                        tangent = nextPoint.clone().sub(point).normalize();
+                    } else if (i === segments) {
+                        // 终点：使用前一个点计算切线
+                        let prevPoint = pathPoints[Math.max(i - 1, 0)];
+                        // 确保前一个点是有效的Vector3对象
+                        if (!prevPoint || typeof prevPoint.clone !== 'function') {
+                            console.error(`无效前一个路径点 at i=${i-1}:`, prevPoint);
+                            prevPoint = new THREE.Vector3((i - 1) * 0.1, 0, 0); // 使用默认点
+                            // 将修复后的点保存回pathPoints数组
+                            pathPoints[Math.max(i - 1, 0)] = prevPoint;
+                        }
+                        tangent = point.clone().sub(prevPoint).normalize();
+                    } else {
+                        // 中间点：使用前后两个点计算切线
+                        let nextPoint = pathPoints[i + 1];
+                        let prevPoint = pathPoints[i - 1];
+                        
+                        // 确保前后点都是有效的Vector3对象
+                        if (!nextPoint || typeof nextPoint.clone !== 'function') {
+                            console.error(`无效下一个路径点 at i=${i+1}:`, nextPoint);
+                            nextPoint = new THREE.Vector3((i + 1) * 0.1, 0, 0); // 使用默认点
+                            // 将修复后的点保存回pathPoints数组
+                            pathPoints[i + 1] = nextPoint;
+                        }
+                        if (!prevPoint || typeof prevPoint.clone !== 'function') {
+                            console.error(`无效前一个路径点 at i=${i-1}:`, prevPoint);
+                            prevPoint = new THREE.Vector3((i - 1) * 0.1, 0, 0); // 使用默认点
+                            // 将修复后的点保存回pathPoints数组
+                            pathPoints[i - 1] = prevPoint;
+                        }
+                        
+                        tangent = nextPoint.clone().sub(prevPoint).normalize();
+                    }
+                } catch (e) {
+                    // 捕获任何切线计算错误，使用默认方向
+                    console.error(`切线计算错误 at i=${i}:`, e);
+                    tangent = new THREE.Vector3(1, 0, 0); // 默认X轴方向
+                }
+                
+                // 确保切线是有效的Vector3对象
+                if (!tangent || typeof tangent.normalize !== 'function') {
+                    console.error(`无效切线 at i=${i}:`, tangent);
+                    tangent = new THREE.Vector3(1, 0, 0); // 默认X轴方向
+                }
+                
+                // 计算垂直于切线的偏移方向（左侧为负，右侧为正）
+                const offsetDirection = new THREE.Vector3(
+                    -tangent.y, // 垂直于切线方向（左转90度）
+                    tangent.x,  // 垂直于切线方向（左转90度）
+                    0
+                );
+                
+                // 根据偏移距离计算偏移后的点
+                const offsetPoint = point.clone().add(
+                    offsetDirection.multiplyScalar(offsetDistance)
+                );
+                
+                // 添加点到偏移路径
+                if (i > 0) {
+                    // 获取前一个点
+                    let prevPoint;
+                    if (offsetPath.curves.length > 0) {
+                        prevPoint = offsetPath.curves[offsetPath.curves.length - 1].v2;
+                    } else if (offsetPath.firstPoint) {
+                        prevPoint = offsetPath.firstPoint;
+                    } else {
+                        // 安全起见，如果没有前一个点，就使用当前点
+                        prevPoint = offsetPoint;
+                    }
+                    offsetPath.add(new THREE.LineCurve3(prevPoint, offsetPoint));
+                } else {
+                    // 第一个点，先保存下来
+                    offsetPath.firstPoint = offsetPoint;
+                }
+            }
+            
+            return offsetPath;
+        }
+
+        // 创建拉伸几何体 - 通用函数
+        function createRail(options = {}) {
+            const {
+                color = 0x333333,
+                trackPath, // 接受已创建的轨道路径
+                startPosition = new THREE.Vector3(0, 0, 0),
+                curveRadius = 200,
+                railName = "钢轨"
+            } = options;
+            
+            const profile = createRailProfile();
+            
+            // 如果没有提供trackPath，则创建新的路径
+            const finalTrackPath = trackPath || createTrackPath({ 
+                startPosition, 
+                curveRadius, 
+                railName 
+            });
+            
+            // 将钢轨轮廓逆时针旋转90度
+            const rotatedProfile = profile.map(point => new THREE.Vector2(-point.y, point.x));
+            
+            const extrudeSettings = {
+                steps: 200, // 优化步数，平衡性能和效果
+                bevelEnabled: false,
+                extrudePath: finalTrackPath
+            };
+            
+            const geometry = new THREE.ExtrudeGeometry(new THREE.Shape(rotatedProfile), extrudeSettings);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                metalness: 0.5,
+                roughness: 0.3
+            });
+            
+            const rail = new THREE.Mesh(geometry, material);
+            rail.castShadow = true;
+            rail.receiveShadow = true;
+            
+            return rail;
+        }
+        
+        // 创建基准轨道路径（中心线）
+        const baseTrackPath = createTrackPath({
+            startPosition: new THREE.Vector3(0, 0, 0),
+            curveRadius: 200,
+            railName: "基准轨道（中心线）"
+        });
+        
+        // 创建左右轨道的偏移路径
+        const leftTrackPath = offsetTrackPath(baseTrackPath, -0.7175); // 左轨偏移-0.7175米
+        const rightTrackPath = offsetTrackPath(baseTrackPath, 0.7175); // 右轨偏移+0.7175米
+        
+        // 创建第一条钢轨（左轨）
+        const rail = createRail({
+            color: 0x333333,
+            trackPath: leftTrackPath,
+            railName: "第一条轨道"
+        });
+        scene.add(rail);
+        
+        // 创建第二条钢轨（右轨）
+        const rail2 = createRail({
+            color: 0x444444,
+            trackPath: rightTrackPath,
+            railName: "第二条轨道"
+        });
+        scene.add(rail2);
+        
+        // 在主场景中添加基准轨道路径（中心线）的线可视化
+        const baseScenePathGeometry = new THREE.BufferGeometry();
+        const baseScenePathPoints = [];
+        
+        // 生成基准路径上的点
+        for (let t = 0; t <= 1; t += 0.002) {
+            const point = baseTrackPath.getPoint(t);
+            baseScenePathPoints.push(point.x, point.y, point.z + 0.3); // 稍微高出轨道，确保可见
+        }
+        
+        baseScenePathGeometry.setAttribute('position', new THREE.Float32BufferAttribute(baseScenePathPoints, 3));
+        
+        // 使用黄色实线材质，Three.js 0.150.1版本的BufferGeometry不支持computeLineDistances
+        const baseScenePathMaterial = new THREE.LineBasicMaterial({
+            color: 0xffff00, // 黄色
+            linewidth: 3
+        });
+        
+        const baseScenePathLine = new THREE.Line(baseScenePathGeometry, baseScenePathMaterial);
+        scene.add(baseScenePathLine);
+        
+        // 绘制2D廓形
+        drawRailProfile();
+        
+        // 绘制钢轨2D廓形到Canvas
+        function drawRailProfile() {
+            const canvas = document.getElementById('profileCanvas');
+            const ctx = canvas.getContext('2d');
+            const points = createRailProfile();
+            
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置绘图样式
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'rgba(51, 51, 51, 0.1)';
+            
+            // 计算坐标转换参数
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const padding = 20;
+            
+            // 找出点的最小和最大坐标
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            
+            points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                maxX = Math.max(maxX, point.x);
+                minY = Math.min(minY, point.y);
+                maxY = Math.max(maxY, point.y);
+            });
+            
+            // 计算缩放比例
+            const widthRange = maxX - minX;
+            const heightRange = maxY - minY;
+            const scale = Math.min(
+                (canvasWidth - 2 * padding) / widthRange,
+                (canvasHeight - 2 * padding) / heightRange
+            );
+            
+            // 计算偏移量
+            const offsetX = canvasWidth / 2;
+            const offsetY = canvasHeight / 2;
+            
+            // 开始绘制路径
+            ctx.beginPath();
+            
+            // 转换第一个点
+            const firstPoint = points[0];
+            const firstCanvasX = offsetX + firstPoint.x * scale;
+            const firstCanvasY = offsetY - firstPoint.y * scale; // Y轴翻转
+            ctx.moveTo(firstCanvasX, firstCanvasY);
+            
+            // 绘制其他点
+            for (let i = 1; i < points.length; i++) {
+                const point = points[i];
+                const canvasX = offsetX + point.x * scale;
+                const canvasY = offsetY - point.y * scale; // Y轴翻转
+                ctx.lineTo(canvasX, canvasY);
+            }
+            
+            // 闭合路径
+            ctx.closePath();
+            
+            // 填充和描边
+            ctx.fill();
+            ctx.stroke();
+            
+            // 绘制坐标轴
+            ctx.strokeStyle = '#999999';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            // X轴
+            ctx.beginPath();
+            ctx.moveTo(padding, offsetY);
+            ctx.lineTo(canvasWidth - padding, offsetY);
+            ctx.stroke();
+            
+            // Y轴
+            ctx.beginPath();
+            ctx.moveTo(offsetX, padding);
+            ctx.lineTo(offsetX, canvasHeight - padding);
+            ctx.stroke();
+            
+            // 重置线条样式
+            ctx.setLineDash([]);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#333333';
+        }
+        
+        // 创建缩略图场景
+        function createThumbnail() {
+            const thumbnailCanvas = document.getElementById('thumbnailCanvas');
+            const thumbnailRenderer = new THREE.WebGLRenderer({ 
+                canvas: thumbnailCanvas, 
+                antialias: true, 
+                alpha: true 
+            });
+            
+            const thumbnailScene = new THREE.Scene();
+            thumbnailScene.background = new THREE.Color(0xf5f5f5);
+            
+            // 创建缩略图钢轨的通用函数
+            function createThumbnailRail(options = {}) {
+                const {
+                    color = 0x333333,
+                    trackPath,
+                    startPosition = new THREE.Vector3(0, 0, 0),
+                    curveRadius = 200
+                } = options;
+                
+                const profile = createRailProfile();
+                // 若未提供trackPath，则创建默认路径
+                const finalTrackPath = trackPath || createTrackPath({ 
+                    startPosition, 
+                    curveRadius,
+                    railName: "缩略图轨道" 
+                });
+                
+                // 将钢轨轮廓逆时针旋转90度
+                const rotatedProfile = profile.map(point => new THREE.Vector2(-point.y, point.x));
+                
+                const extrudeSettings = {
+                    steps: 100, // 缩略图使用更少的步数提高性能
+                    bevelEnabled: false,
+                    extrudePath: finalTrackPath
+                };
+                
+                const geometry = new THREE.ExtrudeGeometry(
+                    new THREE.Shape(rotatedProfile), 
+                    extrudeSettings
+                );
+                
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    metalness: 0.5,
+                    roughness: 0.3
+                });
+                
+                return new THREE.Mesh(geometry, material);
+            }
+            
+            // 创建基准轨道路径（中心线）
+            const baseThumbnailTrackPath = createTrackPath({
+                startPosition: new THREE.Vector3(0, 0, 0),
+                curveRadius: 200,
+                railName: "缩略图基准轨道（中心线）"
+            });
+            
+            // 创建左右轨道的偏移路径
+            const leftThumbnailTrackPath = offsetTrackPath(baseThumbnailTrackPath, -0.7175); // 左轨偏移-0.7175米
+            const rightThumbnailTrackPath = offsetTrackPath(baseThumbnailTrackPath, 0.7175); // 右轨偏移+0.7175米
+            
+            // 创建第一条缩略图钢轨（左轨）
+            const thumbnailRail = createThumbnailRail({
+                color: 0x333333,
+                trackPath: leftThumbnailTrackPath
+            });
+            thumbnailScene.add(thumbnailRail);
+            
+            // 创建第二条缩略图钢轨（右轨）
+            const thumbnailRail2 = createThumbnailRail({
+                color: 0x444444,
+                trackPath: rightThumbnailTrackPath
+            });
+            thumbnailScene.add(thumbnailRail2);
+            
+            // 获取路径用于绘制路径线
+            const thumbnailTrackPath = leftThumbnailTrackPath;
+            const thumbnailTrackPath2 = rightThumbnailTrackPath;
+            
+            // 添加光源
+            const thumbnailAmbientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            thumbnailScene.add(thumbnailAmbientLight);
+            
+            const thumbnailDirectionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            thumbnailDirectionalLight.position.set(10, 20, 10);
+            thumbnailScene.add(thumbnailDirectionalLight);
+            
+            // 创建从更高位置俯视的相机
+            const thumbnailCamera = new THREE.OrthographicCamera(
+                -1000, 800, 450, -450, 0.1, 10000  // 扩大视野范围，看到更完整的轨迹
+            );
+            thumbnailCamera.position.set(0, 0, 2000); // 抬高相机位置，从更高处俯视环形轨道
+            thumbnailCamera.lookAt(0, 0, 0);
+            
+            // 添加XOY平面网格辅助线
+            const gridHelper = new THREE.GridHelper(1000, 50, 0xcccccc, 0xcccccc);
+            // 旋转网格使其在XOY平面内（默认在XZ平面）
+            gridHelper.rotation.x = Math.PI / 2;
+            thumbnailScene.add(gridHelper);
+            
+            // 可视化轨道路径（青绿色）
+            const pathGeometry = new THREE.BufferGeometry();
+            const pathPoints = [];
+            
+            // 生成路径上的点
+            for (let t = 0; t <= 1; t += 0.002) { // 增加采样点密度以确保曲线平滑
+                const point = thumbnailTrackPath.getPoint(t);
+                pathPoints.push(point.x, point.y, 0.5); // 稍微高出轨道，避免被遮挡（在XOY平面内）
+            }
+            
+            pathGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pathPoints, 3));
+            
+            // 使用青绿色材质
+            const pathMaterial = new THREE.LineBasicMaterial({
+                color: 0x00ffcc, // 青绿色
+                linewidth: 3
+            });
+            
+            const pathLine = new THREE.Line(pathGeometry, pathMaterial);
+            thumbnailScene.add(pathLine);
+            
+            // 添加第二条轨道路径线（红色，以区分）
+            const pathGeometry2 = new THREE.BufferGeometry();
+            const pathPoints2 = [];
+            
+            // 生成第二条路径上的点
+            for (let t = 0; t <= 1; t += 0.002) {
+                const point = thumbnailTrackPath2.getPoint(t);
+                pathPoints2.push(point.x, point.y, 0.5); // 稍微高出轨道，避免被遮挡
+            }
+            
+            pathGeometry2.setAttribute('position', new THREE.Float32BufferAttribute(pathPoints2, 3));
+            
+            // 使用红色材质
+            const pathMaterial2 = new THREE.LineBasicMaterial({
+                color: 0xff4444, // 红色
+                linewidth: 2
+            });
+            
+            const pathLine2 = new THREE.Line(pathGeometry2, pathMaterial2);
+            thumbnailScene.add(pathLine2);
+            
+            // 添加基准轨道路径（中心线）的线可视化
+            const basePathGeometry = new THREE.BufferGeometry();
+            const basePathPoints = [];
+            
+            // 生成基准路径上的点
+            for (let t = 0; t <= 1; t += 0.002) {
+                const point = baseThumbnailTrackPath.getPoint(t);
+                basePathPoints.push(point.x, point.y, 0.6); // 稍微高出其他路径线，确保可见
+            }
+            
+            basePathGeometry.setAttribute('position', new THREE.Float32BufferAttribute(basePathPoints, 3));
+            
+            // 使用黄色实线材质，Three.js 0.150.1版本的BufferGeometry不支持computeLineDistances
+            const basePathMaterial = new THREE.LineBasicMaterial({
+                color: 0xffff00, // 黄色
+                linewidth: 4
+            });
+            
+            const basePathLine = new THREE.Line(basePathGeometry, basePathMaterial);
+            thumbnailScene.add(basePathLine);
+            
+            // 渲染缩略图
+            thumbnailRenderer.render(thumbnailScene, thumbnailCamera);
+        }
+        
+        // 生成缩略图
+        createThumbnail();
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
