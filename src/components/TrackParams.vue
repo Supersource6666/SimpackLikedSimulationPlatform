@@ -2,7 +2,6 @@
   <div class="track-params-container">
     <div class="params-header">
       <h1>轨道参数设置</h1>
-      <p>配置轨道的平断面和纵断面参数，系统将自动生成完整的轨道</p>
     </div>
     
     <div class="params-tabs">
@@ -23,6 +22,28 @@
     </div>
     
     <div class="params-main">
+      <!-- 侧边栏 -->
+      <div class="sidebar">
+        <div class="sidebar-content">
+          <h3>轨道参数设置</h3>
+          <div class="sidebar-section">
+            <h4>平断面</h4>
+            <p>轨道段总数: {{ trackParams.horizontalSegments.length }}</p>
+            <p>总长度: {{ totalLength.toFixed(2) }} m</p>
+          </div>
+          <div class="sidebar-section">
+            <h4>纵断面</h4>
+            <p>轨道段总数: {{ trackParams.verticalSegments.length }}</p>
+            <p>总长度: {{ verticalTotalLength.toFixed(2) }} m</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 拖拽把手 -->
+      <div class="sidebar-resizer" ref="sidebarResizer"></div>
+      
+      <!-- 主内容区域 -->
+      <div class="main-content">
       <!-- 平断面参数设置 -->
       <div v-if="activeTab === 'horizontal'">
         <!-- 轨道段列表 -->
@@ -33,7 +54,10 @@
             <div class="segment-length">长度 (m)</div>
             <div class="segment-radius" v-if="showRadiusColumn">半径 (m)</div>
             <div class="segment-angle" v-if="showAngleColumn">角度 (°)</div>
-            <div class="segment-actions">操作</div>
+            <div class="segment-actions">
+              操作
+              <button class="btn btn-add-icon" @click="addSegment" title="添加轨道段">+</button>
+            </div>
           </div>
           
           <div 
@@ -82,11 +106,7 @@
           </div>
         </div>
         
-        <!-- 操作按钮组 -->
-        <div class="params-actions">
-          <button class="btn btn-add" @click="addSegment">添加轨道段</button>
-          <button class="btn btn-submit" @click="saveAndNavigate">提交</button>
-        </div>
+        
         
         <!-- 当前配置预览 -->
         <div class="params-preview">
@@ -126,7 +146,10 @@
             <div class="segment-length">长度 (m)</div>
             <div class="segment-grade">坡度 (%)</div>
             <div class="segment-start-elevation">起点高程 (m)</div>
-            <div class="segment-actions">操作</div>
+            <div class="segment-actions">
+              操作
+              <button class="btn btn-add-icon" @click="addSegment" title="添加轨道段">+</button>
+            </div>
           </div>
           
           <div 
@@ -210,11 +233,13 @@
           </div>
         </div>
         
-        <!-- 操作按钮组 -->
-        <div class="params-actions">
-          <button class="btn btn-add" @click="addSegment">添加轨道段</button>
-          <button class="btn btn-submit" @click="saveAndNavigate">提交</button>
-        </div>
+        
+      </div>
+      </div> <!-- 关闭main-content -->
+      
+      <!-- 右下角提交按钮 -->
+      <div class="floating-submit">
+        <button class="btn btn-submit" @click="saveAndNavigate">提交</button>
       </div>
     </div>
   </div>
@@ -230,6 +255,57 @@ const router = useRouter();
 const trackPreviewCanvas = ref(null);
 // 纵断面轨道预览canvas引用
 const verticalTrackPreviewCanvas = ref(null);
+// 侧边栏拖拽相关引用
+const sidebarResizer = ref(null);
+const sidebar = ref(null);
+const isResizing = ref(false);
+const sidebarWidth = ref(250); // 初始宽度
+
+// 侧边栏拖拽功能
+const initSidebarResize = () => {
+  if (!sidebarResizer.value) return;
+  
+  sidebar.value = document.querySelector('.sidebar');
+  
+  const onMouseDown = (e) => {
+    isResizing.value = true;
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    
+    // 隐藏选择文本的光标样式
+    document.body.style.userSelect = 'none';
+  };
+  
+  const onMouseMove = (e) => {
+    if (!isResizing.value) return;
+    
+    // 获取侧边栏的位置
+    const sidebarRect = sidebar.value.getBoundingClientRect();
+    const containerRect = document.querySelector('.track-params-container').getBoundingClientRect();
+    
+    // 计算新的侧边栏宽度（考虑容器边界）
+    let newWidth = e.clientX - containerRect.left;
+    
+    // 设置最小和最大宽度限制
+    newWidth = Math.max(200, Math.min(500, newWidth));
+    
+    // 更新侧边栏宽度
+    sidebarWidth.value = newWidth;
+    sidebar.value.style.width = `${newWidth}px`;
+  };
+  
+  const onMouseUp = () => {
+    isResizing.value = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    
+    // 恢复选择文本的光标样式
+    document.body.style.userSelect = '';
+  };
+  
+  // 添加鼠标按下事件监听
+  sidebarResizer.value.addEventListener('mousedown', onMouseDown);
+};
 
 // Tab切换状态
 const activeTab = ref('horizontal');
@@ -925,10 +1001,11 @@ onMounted(() => {
   console.log('本地平断面轨道段数据初始化完成:', trackParams.horizontalSegments);
   console.log('本地纵断面轨道段数据初始化完成:', trackParams.verticalSegments);
   
-  // 延迟绘制，确保DOM已渲染
+  // 延迟绘制和初始化拖拽功能，确保DOM已渲染
   nextTick(() => {
     drawTrackPreview();
     drawVerticalTrackPreview();
+    initSidebarResize();
   });
 });
 
@@ -954,10 +1031,11 @@ watch(
 <style scoped>
 .track-params-container {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
   background-color: #f5f7fa;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Tabs样式 */
@@ -991,7 +1069,7 @@ watch(
 
 .params-header {
   background-color: #ffffff;
-  padding: 2rem 3rem;
+  padding: 1.5rem 3rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -1001,18 +1079,14 @@ watch(
   color: #333333;
 }
 
-.params-header p {
-  margin: 0.5rem 0 0 0;
-  color: #666666;
-  font-size: 1rem;
-}
-
 .params-main {
   flex: 1;
-  padding: 2rem 3rem;
+  padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  flex-direction: row;
+  gap: 0;
+  overflow: hidden;
+  height: 100%;
 }
 
 .segments-list {
@@ -1139,6 +1213,30 @@ watch(
   transform: translateY(-1px);
 }
 
+/* 添加轨道段图标按钮样式 */
+.btn-add-icon {
+  background-color: #28a745;
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-add-icon:hover {
+  background-color: #218838;
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
 .params-preview {
   background-color: #ffffff;
   border-radius: 8px;
@@ -1173,8 +1271,124 @@ watch(
 .preview-item .value {
     color: #007bff;
     font-weight: bold;
-    font-size: 1.1rem;
-  }
+}
+
+/* 侧边栏样式 */
+.params-main {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  padding: 1.5rem;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sidebar h3 {
+  margin-top: 0;
+  color: #333333;
+  font-size: 1.2rem;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 0.5rem;
+}
+
+.sidebar-section {
+  background-color: #ffffff;
+  border-radius: 6px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-section h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #007bff;
+  font-size: 1rem;
+}
+
+.sidebar-section p {
+  margin: 0.25rem 0;
+  color: #666666;
+  font-size: 0.9rem;
+}
+
+/* 拖拽把手样式 */
+.sidebar-resizer {
+  width: 6px;
+  background-color: #dee2e6;
+  cursor: col-resize;
+  transition: background-color 0.2s;
+}
+
+/* 浮动提交按钮样式 */
+.floating-submit {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 1000;
+}
+
+.floating-submit .btn-submit {
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.sidebar-resizer:hover {
+  background-color: #adb5bd;
+}
+
+.sidebar-resizer:active {
+  background-color: #6c757d;
+}
+
+/* 主内容区域样式 */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem 3rem;
+  height: 100%;
+  min-height: 0;
+  /* 自定义滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: #007bff #f5f5f5;
+}
+
+/* Webkit浏览器滚动条样式 */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background-color: #007bff;
+  border-radius: 4px;
+  border: 2px solid #f5f5f5;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background-color: #0056b3;
+}
 
 /* 二维轨道曲线预览样式 */
 .preview-canvas {
