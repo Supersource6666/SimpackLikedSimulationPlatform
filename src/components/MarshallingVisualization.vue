@@ -214,11 +214,14 @@ function addLineSegment(path, length, state) {
 // 添加圆弧段
 function addArcSegment(path, radius, angle, state) {
   const segments = 50
-  const sign = angle > 0 ? 1 : -1
+  // 使用半径的符号决定轨道弯曲方向，当半径为负时改变轨道弯曲方向
+  const sign = radius > 0 ? 1 : -1;
+  // 使用半径的绝对值计算圆心位置
+  const absRadius = Math.abs(radius);
   const center = new THREE.Vector3(
-    state.position.x - sign * radius * Math.sin(state.heading),
+    state.position.x - sign * absRadius * Math.sin(state.heading),
     0,
-    state.position.z + sign * radius * Math.cos(state.heading)
+    state.position.z + sign * absRadius * Math.cos(state.heading)
   )
   
   let prevPoint = state.position.clone()
@@ -228,9 +231,9 @@ function addArcSegment(path, radius, angle, state) {
     const theta = state.heading + angle * t
     
     const point = new THREE.Vector3(
-      center.x + sign * radius * Math.sin(theta),
+      center.x + sign * absRadius * Math.sin(theta),
       0,
-      center.z - sign * radius * Math.cos(theta)
+      center.z - sign * absRadius * Math.cos(theta)
     )
     
     path.add(new THREE.LineCurve3(prevPoint, point))
@@ -269,7 +272,15 @@ function createRailSegment(options = {}) {
   for (let i = 0; i <= segments; i++) {
     const t = startT + (endT - startT) * (i / segments)
     const point = trackPath.getPoint(t)
-    const tangent = trackPath.getTangent(t).normalize()
+    
+    // 添加空值检查，确保切线不为null
+    let tangent = trackPath.getTangent(t)
+    if (!tangent) {
+      // 如果切线为null，使用默认的切线向量（沿X轴正方向）
+      tangent = new THREE.Vector3(1, 0, 0)
+    } else {
+      tangent = tangent.normalize()
+    }
     
     // 计算垂直于切线的方向
     const normal = new THREE.Vector3(
@@ -446,7 +457,14 @@ function updateTrainPosition(progress) {
   
   // 获取路径上的点和切线
   const point = trackPath.getPoint(progress)
-  const tangent = trackPath.getTangent(progress).normalize()
+  // 添加空值检查，确保切线不为null
+  let tangent = trackPath.getTangent(progress)
+  if (!tangent) {
+    // 如果切线为null，使用默认的切线向量（沿X轴正方向）
+    tangent = new THREE.Vector3(1, 0, 0)
+  } else {
+    tangent = tangent.normalize()
+  }
   
   // 设置列车位置，提高y轴位置使列车在轨道上
   train.position.copy(point)
@@ -656,8 +674,14 @@ function drawMinimap(ctx, width, height) {
   for (let i = 0; i <= numSamples; i++) {
     const t = i / numSamples
     const point = trackPath.getPoint(t)
-    const tangent = trackPath.getTangent(t).normalize()
-    
+    // 添加空值检查，确保切线不为null
+    let tangent = trackPath.getTangent(t)
+    if (!tangent) {
+      // 如果切线为null，使用默认的切线向量（沿X轴正方向）
+      tangent = new THREE.Vector3(1, 0, 0)
+    } else {
+      tangent = tangent.normalize()
+    }
     // 计算垂直于切线的方向
     const normal = new THREE.Vector3(
       -tangent.z,
@@ -796,7 +820,14 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   
   // 获取列车在路径上的位置
   const point = trackPath.getPoint(progress)
-  const tangent = trackPath.getTangent(progress).normalize()
+  // 添加空值检查，确保切线不为null
+  let tangent = trackPath.getTangent(progress)
+  if (!tangent) {
+    // 如果切线为null，使用默认的切线向量（沿X轴正方向）
+    tangent = new THREE.Vector3(1, 0, 0)
+  } else {
+    tangent = tangent.normalize()
+  }
   
   // 计算屏幕坐标
   const screenX = offsetX + (point.x - minX) * scale

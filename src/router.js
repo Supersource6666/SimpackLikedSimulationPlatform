@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import TrackView from './components/TrackView.vue'
 import Parameter from './components/Parameter.vue'
-import TrackInspection from './components/TrackInspection.vue'
+import MarshallingVisualization from './components/MarshallingVisualization.vue'
 
 const routes = [
   {
@@ -15,9 +15,9 @@ const routes = [
     component: TrackView
   },
   {
-    path: '/inspection',
-    name: 'TrackInspection',
-    component: TrackInspection
+    path: '/marshalling-visualization',
+    name: 'marshalling-visualization',
+    component: MarshallingVisualization
   }
 ]
 
@@ -27,3 +27,4 @@ const router = createRouter({
 })
 
 export default router
+

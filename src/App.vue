@@ -6,7 +6,7 @@
       <div class="nav-links">
         <router-link to="/" class="nav-link">参数设置</router-link>
         <router-link to="/track" class="nav-link">轨道视图</router-link>
-        <router-link to="/inspection" class="nav-link">轨检列车视图</router-link>
+        <router-link to="/marshalling-visualization" class="nav-link">编组可视化</router-link>
       </div>
     </nav>
     
