@@ -12,12 +12,43 @@ const initialVerticalSegments = [
   { id: 1, type: 'grade', length: 200, grade: 0, startElevation: 0 }
 ]
 
+// 初始车辆参数
+const initialVehicleParams = {
+  name: '',
+  type: 'train',
+  weight: 100,
+  maxSpeed: 120,
+  axles: 8,
+  powerType: 'electric',
+  maxPower: 4000,
+  traction: 200,
+  brakePower: 3000,
+  capacity: 1000
+}
+
+// 初始运行参数
+const initialOperationParams = {
+  mode: 'automatic',
+  speed: 80,
+  acceleration: 0.5,
+  deceleration: 0.8,
+  stopTime: 30,
+  safetyDistance: 50,
+  maxGrade: 3,
+  curveSpeedFactor: 0.8,
+  emergencyBrakeThreshold: 'medium'
+}
+
 // 创建单例响应式状态
 const trackParams = reactive({
   // 平断面轨道段数组 - 只包含直线和圆曲线，缓和曲线会自动插入
   horizontalSegments: JSON.parse(JSON.stringify(initialHorizontalSegments)),
   // 纵断面轨道段数组 - 包含坡道和竖曲线
-  verticalSegments: JSON.parse(JSON.stringify(initialVerticalSegments))
+  verticalSegments: JSON.parse(JSON.stringify(initialVerticalSegments)),
+  // 车辆参数
+  vehicleParams: JSON.parse(JSON.stringify(initialVehicleParams)),
+  // 运行参数
+  operationParams: JSON.parse(JSON.stringify(initialOperationParams))
 })
 
 // 设置平断面轨道段
@@ -74,6 +105,32 @@ const getVerticalSegments = () => {
   return trackParams.verticalSegments
 }
 
+// 设置车辆参数
+const setVehicleParams = (newParams) => {
+  console.log('trackStore.setVehicleParams called with:', newParams);
+  // 更新车辆参数对象
+  Object.assign(trackParams.vehicleParams, newParams);
+  console.log('trackStore vehicleParams after setVehicleParams:', trackParams.vehicleParams);
+}
+
+// 获取车辆参数
+const getVehicleParams = () => {
+  return trackParams.vehicleParams
+}
+
+// 设置运行参数
+const setOperationParams = (newParams) => {
+  console.log('trackStore.setOperationParams called with:', newParams);
+  // 更新运行参数对象
+  Object.assign(trackParams.operationParams, newParams);
+  console.log('trackStore operationParams after setOperationParams:', trackParams.operationParams);
+}
+
+// 获取运行参数
+const getOperationParams = () => {
+  return trackParams.operationParams
+}
+
 // 向后兼容的方法
 const setSegments = (newSegments) => {
   console.log('trackStore.setSegments (deprecated) called with:', newSegments);
@@ -108,6 +165,12 @@ export const trackStore = {
   addVerticalSegment,
   deleteVerticalSegment,
   getVerticalSegments,
+  // 车辆参数管理方法
+  setVehicleParams,
+  getVehicleParams,
+  // 运行参数管理方法
+  setOperationParams,
+  getOperationParams,
   // 向后兼容的方法
   setSegments,
   addSegment,

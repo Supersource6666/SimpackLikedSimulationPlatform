@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import TrackView from './components/TrackView.vue'
-import TrackParams from './components/TrackParams.vue'
+import Parameter from './components/Parameter.vue'
 import TrackInspection from './components/TrackInspection.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'TrackParams',
-    component: TrackParams
+    name: 'Parameter',
+    component: Parameter
   },
   {
     path: '/track',

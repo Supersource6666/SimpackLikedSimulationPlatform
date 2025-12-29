@@ -1,40 +1,106 @@
 <template>
   <div class="track-params-container">
     <div class="params-header">
-      <h1>轨道参数设置</h1>
+      <h1>参数设置</h1>
     </div>
     
     <div class="params-tabs">
-      <div 
-        class="tab-item" 
-        :class="{ 'active': activeTab === 'horizontal' }" 
-        @click="activeTab = 'horizontal'"
-      >
-        平断面
-      </div>
-      <div 
-        class="tab-item" 
-        :class="{ 'active': activeTab === 'vertical' }" 
-        @click="activeTab = 'vertical'"
-      >
-        纵断面
-      </div>
+      <!-- 车辆参数Tabs -->
+      <template v-if="activeParamType === 'vehicle'">
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'vehicle-basic' }" 
+          @click="activeTab = 'vehicle-basic'"
+        >
+          基本参数
+        </div>
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'vehicle-power' }" 
+          @click="activeTab = 'vehicle-power'"
+        >
+          动力参数
+        </div>
+      </template>
+      
+      <!-- 轨道参数Tabs -->
+      <template v-else-if="activeParamType === 'track'">
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'horizontal' }" 
+          @click="activeTab = 'horizontal'"
+        >
+          平断面
+        </div>
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'vertical' }" 
+          @click="activeTab = 'vertical'"
+        >
+          纵断面
+        </div>
+      </template>
+      
+      <!-- 运行参数Tabs -->
+      <template v-else-if="activeParamType === 'operation'">
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'operation-mode' }" 
+          @click="activeTab = 'operation-mode'"
+        >
+          运行模式
+        </div>
+        <div 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'safety-params' }" 
+          @click="activeTab = 'safety-params'"
+        >
+          安全参数
+        </div>
+      </template>
     </div>
     
     <div class="params-main">
       <!-- 侧边栏 -->
       <div class="sidebar">
         <div class="sidebar-content">
-          <h3>轨道参数设置</h3>
-          <div class="sidebar-section">
-            <h4>平断面</h4>
-            <p>轨道段总数: {{ trackParams.horizontalSegments.length }}</p>
-            <p>总长度: {{ totalLength.toFixed(2) }} m</p>
+          <h3>参数设置</h3>
+          <div class="sidebar-menu">
+            <div 
+              class="sidebar-menu-item" 
+              :class="{ 'active': activeParamType === 'vehicle' }"
+              @click="activeParamType = 'vehicle'"
+            >
+              车辆参数
+            </div>
+            <div 
+              class="sidebar-menu-item" 
+              :class="{ 'active': activeParamType === 'track' }"
+              @click="activeParamType = 'track'"
+            >
+              轨道参数
+            </div>
+            <div 
+              class="sidebar-menu-item" 
+              :class="{ 'active': activeParamType === 'operation' }"
+              @click="activeParamType = 'operation'"
+            >
+              运行参数
+            </div>
           </div>
-          <div class="sidebar-section">
-            <h4>纵断面</h4>
-            <p>轨道段总数: {{ trackParams.verticalSegments.length }}</p>
-            <p>总长度: {{ verticalTotalLength.toFixed(2) }} m</p>
+          
+          <!-- 轨道参数统计信息 -->
+          <div v-if="activeParamType === 'track'" class="sidebar-stats">
+            <div class="sidebar-section">
+              <h4>平断面</h4>
+              <p>轨道段总数: {{ trackParams.horizontalSegments.length }}</p>
+              <p>总长度: {{ totalLength.toFixed(2) }} m</p>
+            </div>
+            <div class="sidebar-section">
+              <h4>纵断面</h4>
+              <p>轨道段总数: {{ trackParams.verticalSegments.length }}</p>
+              <p>总长度: {{ verticalTotalLength.toFixed(2) }} m</p>
+            </div>
           </div>
         </div>
       </div>
@@ -44,8 +110,75 @@
       
       <!-- 主内容区域 -->
       <div class="main-content">
-      <!-- 平断面参数设置 -->
-      <div v-if="activeTab === 'horizontal'">
+        <!-- 车辆参数内容 -->
+        <div v-if="activeParamType === 'vehicle'">
+          <!-- 基本参数 -->
+          <div v-if="activeTab === 'vehicle-basic'">
+            <h2>车辆基本参数</h2>
+            <div class="params-form">
+              <div class="form-group">
+                <label>车辆名称</label>
+                <input type="text" v-model="vehicleParams.name" placeholder="输入车辆名称" />
+              </div>
+              <div class="form-group">
+                <label>车辆类型</label>
+                <select v-model="vehicleParams.type">
+                  <option value="train">列车</option>
+                  <option value="locomotive">机车</option>
+                  <option value="car">车厢</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>车辆重量 (t)</label>
+                <input type="number" v-model.number="vehicleParams.weight" min="1" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>最大速度 (km/h)</label>
+                <input type="number" v-model.number="vehicleParams.maxSpeed" min="1" step="1" />
+              </div>
+              <div class="form-group">
+                <label>轴数</label>
+                <input type="number" v-model.number="vehicleParams.axles" min="2" step="2" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- 动力参数 -->
+          <div v-if="activeTab === 'vehicle-power'">
+            <h2>车辆动力参数</h2>
+            <div class="params-form">
+              <div class="form-group">
+                <label>动力类型</label>
+                <select v-model="vehicleParams.powerType">
+                  <option value="electric">电力</option>
+                  <option value="diesel">柴油</option>
+                  <option value="hybrid">混合动力</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>最大功率 (kW)</label>
+                <input type="number" v-model.number="vehicleParams.maxPower" min="1" step="1" />
+              </div>
+              <div class="form-group">
+                <label>牵引力 (kN)</label>
+                <input type="number" v-model.number="vehicleParams.traction" min="1" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>制动功率 (kW)</label>
+                <input type="number" v-model.number="vehicleParams.brakePower" min="1" step="1" />
+              </div>
+              <div class="form-group">
+                <label>燃油/电量容量</label>
+                <input type="number" v-model.number="vehicleParams.capacity" min="1" step="1" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 轨道参数内容 -->
+        <div v-if="activeParamType === 'track'">
+          <!-- 平断面参数设置 -->
+          <div v-if="activeTab === 'horizontal'">
         <!-- 轨道段列表 -->
         <div class="segments-list">
           <div class="segment-item header">
@@ -232,9 +365,69 @@
             <canvas ref="verticalTrackPreviewCanvas" width="400" height="300"></canvas>
           </div>
         </div>
-        
-        
       </div>
+    </div> <!-- 关闭轨道参数内容 -->
+      
+      <!-- 运行参数内容 -->
+      <div v-if="activeParamType === 'operation'">
+          <!-- 运行模式 -->
+          <div v-if="activeTab === 'operation-mode'">
+            <h2>运行模式参数</h2>
+            <div class="params-form">
+              <div class="form-group">
+                <label>运行模式</label>
+                <select v-model="operationParams.mode">
+                  <option value="manual">手动</option>
+                  <option value="automatic">自动</option>
+                  <option value="semi-automatic">半自动</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>运行速度 (km/h)</label>
+                <input type="number" v-model.number="operationParams.speed" min="1" step="1" />
+              </div>
+              <div class="form-group">
+                <label>加速度 (m/s²)</label>
+                <input type="number" v-model.number="operationParams.acceleration" min="0.1" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>减速度 (m/s²)</label>
+                <input type="number" v-model.number="operationParams.deceleration" min="0.1" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>停靠时间 (s)</label>
+                <input type="number" v-model.number="operationParams.stopTime" min="0" step="1" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- 安全参数 -->
+          <div v-if="activeTab === 'safety-params'">
+            <h2>安全参数</h2>
+            <div class="params-form">
+              <div class="form-group">
+                <label>安全距离 (m)</label>
+                <input type="number" v-model.number="operationParams.safetyDistance" min="1" step="1" />
+              </div>
+              <div class="form-group">
+                <label>最大允许坡度 (%)</label>
+                <input type="number" v-model.number="operationParams.maxGrade" min="0" max="5" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>曲线限速系数</label>
+                <input type="number" v-model.number="operationParams.curveSpeedFactor" min="0.5" max="1" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label>紧急制动触发阈值</label>
+                <select v-model="operationParams.emergencyBrakeThreshold">
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
       </div> <!-- 关闭main-content -->
       
       <!-- 右下角提交按钮 -->
@@ -307,6 +500,9 @@ const initSidebarResize = () => {
   sidebarResizer.value.addEventListener('mousedown', onMouseDown);
 };
 
+// 参数类型切换状态
+const activeParamType = ref('track');
+
 // Tab切换状态
 const activeTab = ref('horizontal');
 
@@ -314,6 +510,48 @@ const activeTab = ref('horizontal');
 const trackParams = reactive({
   horizontalSegments: [],
   verticalSegments: []
+});
+
+// 车辆参数状态
+const vehicleParams = reactive({
+  name: '',
+  type: 'train',
+  weight: 100,
+  maxSpeed: 120,
+  axles: 8,
+  powerType: 'electric',
+  maxPower: 4000,
+  traction: 200,
+  brakePower: 3000,
+  capacity: 1000
+});
+
+// 运行参数状态
+const operationParams = reactive({
+  mode: 'automatic',
+  speed: 80,
+  acceleration: 0.5,
+  deceleration: 0.8,
+  stopTime: 30,
+  safetyDistance: 50,
+  maxGrade: 3,
+  curveSpeedFactor: 0.8,
+  emergencyBrakeThreshold: 'medium'
+});
+
+// 监听参数类型变化，自动切换到对应默认Tab
+watch(activeParamType, (newType) => {
+  switch (newType) {
+    case 'vehicle':
+      activeTab.value = 'vehicle-basic';
+      break;
+    case 'track':
+      activeTab.value = 'horizontal';
+      break;
+    case 'operation':
+      activeTab.value = 'operation-mode';
+      break;
+  }
 });
 
 // 纵断面参数
@@ -936,12 +1174,18 @@ const saveAndNavigate = async () => {
   console.log('保存并跳转到轨道视图');
   console.log('当前平断面轨道段参数:', trackParams.horizontalSegments);
   console.log('当前纵断面轨道段参数:', trackParams.verticalSegments);
+  console.log('当前车辆参数:', vehicleParams);
+  console.log('当前运行参数:', operationParams);
   
   // 同步到store
   trackStore.setHorizontalSegments(trackParams.horizontalSegments);
   trackStore.setVerticalSegments(trackParams.verticalSegments);
+  trackStore.setVehicleParams(vehicleParams);
+  trackStore.setOperationParams(operationParams);
   console.log('保存到trackStore - 平断面:', trackStore.trackParams.horizontalSegments);
   console.log('保存到trackStore - 纵断面:', trackStore.trackParams.verticalSegments);
+  console.log('保存到trackStore - 车辆参数:', trackStore.trackParams.vehicleParams);
+  console.log('保存到trackStore - 运行参数:', trackStore.trackParams.operationParams);
   
   // 确保数据已更新
   await nextTick();
@@ -963,7 +1207,7 @@ const saveAndNavigate = async () => {
 
 // 组件挂载时，从store加载数据
 onMounted(() => {
-  console.log('TrackParams.vue mounted');
+  console.log('Parameter.vue mounted');
   
   // 从store获取初始数据
   const storeHorizontalSegments = trackStore.getHorizontalSegments();
@@ -1325,6 +1569,95 @@ watch(
   font-size: 0.9rem;
 }
 
+/* 侧边栏菜单样式 */
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.sidebar-menu-item {
+  padding: 0.8rem 1rem;
+  background-color: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #dee2e6;
+  color: #333333;
+  font-weight: 500;
+  border-left: 3px solid transparent;
+}
+
+.sidebar-menu-item:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #007bff;
+}
+
+.sidebar-menu-item.active {
+  background-color: #007bff;
+  color: #ffffff;
+  border-color: #007bff;
+  border-left-color: #0056b3;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.sidebar-menu-item.active:hover {
+  background-color: #0056b3;
+  border-color: #0056b3;
+}
+
+/* 参数表单样式 */
+.params-form {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 2rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 300px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #333333;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group select {
+  padding: 0.8rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-group input[type="number"] {
+  text-align: right;
+}
+
 /* 拖拽把手样式 */
 .sidebar-resizer {
   width: 6px;
@@ -1528,5 +1861,30 @@ watch(
     flex-direction: column;
     gap: 1rem;
   }
+}
+
+
+
+
+
+/* 参数类型切换时的过渡效果 */
+.main-content > div {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* 确保所有参数内容都有一致的内边距 */
+.vehicle-params,
+.operation-params {
+  padding: 1rem 0;
+}
+
+/* 缩小添加按钮的尺寸 */
+.btn-add-icon {
+  padding: 0.4rem 0.8rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  width: auto;
+  min-width: auto;
+  height: auto;
 }
 </style>
