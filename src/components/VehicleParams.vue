@@ -16,6 +16,42 @@
     
     <!-- Tab内容区域 -->
     <div class="tab-content">
+      <!-- 编组参数Tab -->
+      <div v-if="activeTab === 'marshalling'" class="tab-pane">
+        <div class="params-form">
+          <div class="form-group">
+            <label for="train-count">车辆数量</label>
+            <input 
+              id="train-count"
+              v-model.number="vehicleParams.trainCount" 
+              type="number" 
+              min="1"
+              step="1"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="train-spacing">车车间距 (m)</label>
+            <input 
+              id="train-spacing"
+              v-model.number="vehicleParams.trainSpacing" 
+              type="number" 
+              min="0"
+              step="0.5"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="marshalling-type">编组类型</label>
+            <select id="marshalling-type" v-model="vehicleParams.marshallingType">
+              <option value="locomotive-pull">机车牵引</option>
+              <option value="distributed-power">动力分散</option>
+              <option value="multiple-units">动车组</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
       <!-- 车体参数Tab -->
       <div v-if="activeTab === 'body'" class="tab-pane">
         <div class="params-form">
@@ -201,6 +237,7 @@ import { trackStore } from '../store/trackStore.js';
 
 // Tab配置
 const tabs = [
+  { id: 'marshalling', name: '编组参数' },
   { id: 'body', name: '车体参数' },
   { id: 'bogie', name: '转向架参数' },
   { id: 'wheel', name: '车轮与踏面配置' }
@@ -211,6 +248,11 @@ const activeTab = ref('body');
 
 // 车辆参数状态
 const vehicleParams = reactive({
+  // 编组参数
+  trainCount: 2, // 车辆数量
+  trainSpacing: 7, // 车车间距
+  marshallingType: 'locomotive-pull', // 编组类型：机车牵引
+  
   // 车体参数
   name: '',
   type: 'train',
