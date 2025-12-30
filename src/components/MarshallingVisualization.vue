@@ -273,14 +273,9 @@ function createRailSegment(options = {}) {
     const t = startT + (endT - startT) * (i / segments)
     const point = trackPath.getPoint(t)
     
-    // 添加空值检查，确保切线不为null
-    let tangent = trackPath.getTangent(t)
-    if (!tangent) {
-      // 如果切线为null，使用默认的切线向量（沿X轴正方向）
-      tangent = new THREE.Vector3(1, 0, 0)
-    } else {
-      tangent = tangent.normalize()
-    }
+    // 获取切线
+    let tangent = trackPath.getTangentAt(t)
+    tangent = tangent.normalize()
     
     // 计算垂直于切线的方向
     const normal = new THREE.Vector3(
@@ -458,7 +453,7 @@ function updateTrainPosition(progress) {
   // 获取路径上的点和切线
   const point = trackPath.getPoint(progress)
   // 添加空值检查，确保切线不为null
-  let tangent = trackPath.getTangent(progress)
+  let tangent = trackPath.getTangentAt(progress)
   if (!tangent) {
     // 如果切线为null，使用默认的切线向量（沿X轴正方向）
     tangent = new THREE.Vector3(1, 0, 0)
@@ -675,7 +670,7 @@ function drawMinimap(ctx, width, height) {
     const t = i / numSamples
     const point = trackPath.getPoint(t)
     // 添加空值检查，确保切线不为null
-    let tangent = trackPath.getTangent(t)
+    let tangent = trackPath.getTangentAt(t)
     if (!tangent) {
       // 如果切线为null，使用默认的切线向量（沿X轴正方向）
       tangent = new THREE.Vector3(1, 0, 0)
