@@ -1,17 +1,17 @@
 <template>
-  <div class="track-inspection-container">
-    <div class="inspection-header">
-      <h1>轨检列车视图</h1>
-      <div class="inspection-controls">
+  <div class="train-marshalling-container">
+    <div class="marshalling-header">
+      <h1>列车编组展示</h1>
+      <div class="marshalling-controls">
         <button @click="startAnimation" :disabled="isAnimating">开始运行</button>
         <button @click="stopAnimation" :disabled="!isAnimating">停止运行</button>
         <button @click="resetPosition">重置位置</button>
         <button @click="goToParams">参数设置</button>
       </div>
     </div>
-    <div class="inspection-main">
+    <div class="marshalling-main">
       <div ref="canvasContainer" class="canvas-container"></div>
-      <div class="inspection-info">
+      <div class="marshalling-info">
         <div class="info-panel">
           <h3>运行状态</h3>
           <div class="info-item">
@@ -65,7 +65,8 @@ const currentPositionText = computed(() => {
 
 // 场景变量
 let scene, camera, renderer, controls
-let train, rail1, rail2
+let trains = [] // 修改为数组，存储所有车体
+let rail1, rail2
 let trackPath = null
 let trackLength = 0
 
@@ -78,6 +79,12 @@ const segmentLength = 50 // 每个轨道段的长度
 const visibleDistance = 200 // 可见距离（列车前后各显示多少距离的轨道）
 const cacheSize = Math.ceil(visibleDistance / segmentLength) // 缓存段数量
 let currentTrackPosition = 0 // 当前轨道位置（0-1范围）
+
+// 从trackStore获取车辆参数
+const getVehicleParams = () => {
+  return trackStore.getVehicleParams()
+}
+let carSpacing = 7 // 车车间距（基于长方体长度6，留出1个单位间距）
 
 // 跳转到参数设置界面
 function goToParams() {
@@ -430,46 +437,86 @@ function initRailRoots() {
 
 // 创建列车（立方体）
 function createTrain() {
+  // 获取车辆参数
+  const vehicleParams = getVehicleParams()
+  const { trainCount } = vehicleParams
+  
+  // 清空现有车体
+  trains.forEach(train => {
+    scene.remove(train)
+    if (train.geometry) train.geometry.dispose()
+    if (train.material) train.material.dispose()
+  })
+  trains = []
+  
+  // 创建几何体
   const geometry = new THREE.BoxGeometry(3, 2, 6)
-  const material = new THREE.MeshStandardMaterial({ color: 0xff0000 })
-  train = new THREE.Mesh(geometry, material)
-  train.castShadow = true
+  
+  // 根据trainCount创建多个车体，使用不同颜色区分
+  for (let i = 0; i < trainCount; i++) {
+    // 使用HSL颜色空间创建不同颜色的材质
+    const hue = (i / trainCount) * 360
+    const material = new THREE.MeshStandardMaterial({ 
+      color: new THREE.Color(`hsl(${hue}, 100%, 50%)`) 
+    })
+    
+    const train = new THREE.Mesh(geometry, material)
+    train.castShadow = true
+    trains.push(train)
+    scene.add(train)
+  }
   
   // 初始化位置
   if (trackPath) {
     updateTrainPosition(0)
   }
-  
-  scene.add(train)
 }
 
 // 更新列车位置
 function updateTrainPosition(progress) {
-  if (!trackPath || !train) return
+  if (!trackPath || !trains || trains.length === 0) return
   
   // 确保progress在0-1范围内
   progress = Math.max(0, Math.min(1, progress))
   
-  // 获取路径上的点和切线
-  const point = trackPath.getPoint(progress)
-  // 添加空值检查，确保切线不为null
-  let tangent = trackPath.getTangentAt(progress)
-  if (!tangent) {
-    // 如果切线为null，使用默认的切线向量（沿X轴正方向）
-    tangent = new THREE.Vector3(1, 0, 0)
-  } else {
-    tangent = tangent.normalize()
+  // 获取车辆参数
+  const { trainSpacing } = getVehicleParams()
+  
+  // 计算每节车厢之间的间距比例
+  const spacingRatio = trainSpacing / trackLength
+  
+  // 更新所有车体的位置
+  for (let i = 0; i < trains.length; i++) {
+    const carProgress = progress - (i * spacingRatio)
+    
+    // 处理循环边界
+    let adjustedProgress = carProgress
+    if (adjustedProgress < 0) {
+      adjustedProgress += 1
+    }
+    
+    // 获取路径上的点和切线
+    const point = trackPath.getPoint(adjustedProgress)
+    // 添加空值检查，确保切线不为null
+    let tangent = trackPath.getTangentAt(adjustedProgress)
+    if (!tangent) {
+      // 如果切线为null，使用默认的切线向量（沿X轴正方向）
+      tangent = new THREE.Vector3(1, 0, 0)
+    } else {
+      tangent = tangent.normalize()
+    }
+    
+    // 设置列车位置，提高y轴位置使列车在轨道上
+    const train = trains[i]
+    train.position.copy(point)
+    train.position.y = 1.5 // 立方体高度的一半加上一些偏移
+    
+    // 设置列车朝向（沿轨道方向）
+    const up = new THREE.Vector3(0, 1, 0)
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize()
+    train.matrix.lookAt(point, point.clone().add(tangent), up)
+    train.quaternion.setFromRotationMatrix(train.matrix)
   }
-  
-  // 设置列车位置，提高y轴位置使列车在轨道上
-  train.position.copy(point)
-  train.position.y = 1.5 // 立方体高度的一半加上一些偏移
-  
-  // 设置列车朝向（沿轨道方向）
-  const up = new THREE.Vector3(0, 1, 0)
-  const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize()
-  train.matrix.lookAt(point, point.clone().add(tangent), up)
-  train.quaternion.setFromRotationMatrix(train.matrix)
 }
 
 // 创建地面
@@ -523,7 +570,9 @@ function animate() {
     updateRailSegments(animationProgress.value, false) // 更新右侧轨道
     
     // 相机跟随列车移动 - 使用平滑插值
-    if (train) {
+    if (trains.length > 0) {
+      // 获取第一列车的位置和朝向作为参考
+      const train = trains[0]
       // 获取列车的位置和朝向
       const trainPosition = train.position.clone()
       const trainDirection = new THREE.Vector3()
@@ -871,7 +920,7 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
 </script>
 
 <style scoped>
-.track-inspection-container {
+.train-marshalling-container {
   width: 100%;
   height: 100vh;
   display: flex;
@@ -879,7 +928,7 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   background-color: #f5f5f5;
 }
 
-.inspection-header {
+.marshalling-header {
   background-color: #333;
   color: white;
   padding: 1rem 2rem;
@@ -889,17 +938,17 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.inspection-header h1 {
+.marshalling-header h1 {
   margin: 0;
   font-size: 1.5rem;
 }
 
-.inspection-controls {
+.marshalling-controls {
   display: flex;
   gap: 1rem;
 }
 
-.inspection-controls button {
+.marshalling-controls button {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
@@ -910,16 +959,16 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   transition: background-color 0.3s;
 }
 
-.inspection-controls button:hover:not(:disabled) {
+.marshalling-controls button:hover:not(:disabled) {
   background-color: #45a049;
 }
 
-.inspection-controls button:disabled {
+.marshalling-controls button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }
 
-.inspection-main {
+.marshalling-main {
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -931,7 +980,7 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   position: relative;
 }
 
-.inspection-info {
+.marshalling-info {
   width: 300px;
   background-color: white;
   padding: 1.5rem;
@@ -972,3 +1021,10 @@ function drawTrainMarker(ctx, progress, minX, minY, scale, offsetX, offsetY) {
   margin: 0 0.5rem;
 }
 </style>
+
+
+
+
+
+
+

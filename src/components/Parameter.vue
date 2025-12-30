@@ -38,7 +38,7 @@
           <div 
             class="menu-item sub-menu-item" 
             :class="{ active: activeTab === 'trainVisualization' }" 
-            @click="activeTab = 'trainVisualization'"
+            @click="navigateToMarshallingVisualization"
           >
             <div class="menu-icon">🔄</div>
             <div class="menu-text">列车编组可视化</div>
@@ -139,6 +139,11 @@ import OperationParams from './OperationParams.vue';
 const router = useRouter();
 const store = trackStore;
 
+// 导航到列车编组可视化页面
+const navigateToMarshallingVisualization = () => {
+  router.push('/marshalling-visualization');
+};
+
 // 组件引用
 const vehicleParamsRef = ref(null);
 const trackParamsRef = ref(null);
@@ -235,7 +240,7 @@ const saveAllParams = async () => {
       }
     } 
     else if (activeTab.value === 'operation') {
-      // 运行参数页面：保存运行参数，然后跳转到轨检列车视图
+      // 运行参数页面：保存运行参数，然后跳转到列车编组展示
       if (operationParamsRef.value?.getOperationParams) {
         const operationParams = operationParamsRef.value.getOperationParams();
         
@@ -333,6 +338,7 @@ onUnmounted(() => {
   margin-bottom: 0.5rem;
 }
 
+/* 菜单项样式 */
 .menu-item {
   display: flex;
   align-items: center;
@@ -345,7 +351,6 @@ onUnmounted(() => {
 }
 
 .sub-menu-item {
-  padding-left: 3rem;
   font-size: 0.95rem;
 }
 
