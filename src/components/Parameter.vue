@@ -2,75 +2,139 @@
   <div class="parameter-container">
     <!-- 侧边栏 -->
     <div class="sidebar">
-      <div class="menu-title">动力学参数</div>
       <div class="menu-items">
-        <!-- 动力学参数部分 -->
+        <!-- 项目功能部分 -->
         <div class="menu-group">
-          <div 
-            class="menu-item" 
-            :class="{ active: activeTab === 'vehicle' }" 
-            @click="activeTab = 'vehicle'"
-          >
-            <div class="menu-icon">🚆</div>
-            <div class="menu-text">车辆参数</div>
+          <div class="menu-group-title collapsible" @click="toggleGroup('projectFunctions')">
+            <span>项目功能</span>
+            <span class="collapse-icon">{{ collapsedGroups.projectFunctions ? '▶️' : '▼️' }}</span>
           </div>
-          <div 
-            class="menu-item" 
-            :class="{ active: activeTab === 'track' }" 
-            @click="activeTab = 'track'"
-          >
-            <div class="menu-icon">🛤️</div>
-            <div class="menu-text">轨道参数</div>
-          </div>
-          <div 
-            class="menu-item" 
-            :class="{ active: activeTab === 'operation' }" 
-            @click="activeTab = 'operation'"
-          >
-            <div class="menu-icon">⚙️</div>
-            <div class="menu-text">运行参数</div>
+          <div v-if="!collapsedGroups.projectFunctions" class="menu-group-content">
+            <!-- 动力学参数部分 -->
+            <div class="menu-subgroup">
+              <div class="menu-group-title collapsible" @click="toggleGroup('dynamicsParams')">
+                <span>动力学参数</span>
+                <span class="collapse-icon">{{ collapsedGroups.dynamicsParams ? '▶️' : '▼️' }}</span>
+              </div>
+              <div v-if="!collapsedGroups.dynamicsParams" class="menu-group-content">
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'vehicle' }" 
+                  @click="activeTab = 'vehicle'"
+                >
+                  <div class="menu-icon">🚆</div>
+                  <div class="menu-text">车辆参数</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'track' }" 
+                  @click="activeTab = 'track'"
+                >
+                  <div class="menu-icon">🛤️</div>
+                  <div class="menu-text">轨道参数</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'operation' }" 
+                  @click="activeTab = 'operation'"
+                >
+                  <div class="menu-icon">⚙️</div>
+                  <div class="menu-text">运行参数</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 三维场景展示部分 -->
+            <div class="menu-subgroup">
+              <div class="menu-group-title collapsible" @click="toggleGroup('3dScene')">
+                <span>三维场景展示</span>
+                <span class="collapse-icon">{{ collapsedGroups['3dScene'] ? '▶️' : '▼️' }}</span>
+              </div>
+              <div v-if="!collapsedGroups['3dScene']" class="menu-group-content">
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'trainVisualization' }" 
+                  @click="navigateToMarshallingVisualization"
+                >
+                  <div class="menu-icon">🔄</div>
+                  <div class="menu-text">列车编组可视化</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'wheelRailAnalysis' }" 
+                  @click="activeTab = 'wheelRailAnalysis'"
+                >
+                  <div class="menu-icon">🔍</div>
+                  <div class="menu-text">轮轨接触分析</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 动力学安全评估部分 -->
+            <div class="menu-subgroup">
+              <div class="menu-group-title collapsible" @click="toggleGroup('safetyAssessment')">
+                <span>动力学安全评估</span>
+                <span class="collapse-icon">{{ collapsedGroups.safetyAssessment ? '▶️' : '▼️' }}</span>
+              </div>
+              <div v-if="!collapsedGroups.safetyAssessment" class="menu-group-content">
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'dataAnalysis' }" 
+                  @click="activeTab = 'dataAnalysis'"
+                >
+                  <div class="menu-icon">📊</div>
+                  <div class="menu-text">数据分析</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  :class="{ active: activeTab === 'evaluationResults' }" 
+                  @click="activeTab = 'evaluationResults'"
+                >
+                  <div class="menu-icon">✅</div>
+                  <div class="menu-text">评估结果</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         
-        <!-- 三维场景展示部分 -->
+        <!-- 系统功能部分 -->
         <div class="menu-group">
-          <div class="menu-group-title">三维场景展示</div>
-          <div 
-            class="menu-item sub-menu-item" 
-            :class="{ active: activeTab === 'trainVisualization' }" 
-            @click="navigateToMarshallingVisualization"
-          >
-            <div class="menu-icon">🔄</div>
-            <div class="menu-text">列车编组可视化</div>
+          <div class="menu-group-title collapsible" @click="toggleGroup('systemFunctions')">
+            <span>系统功能</span>
+            <span class="collapse-icon">{{ collapsedGroups.systemFunctions ? '▶️' : '▼️' }}</span>
           </div>
-          <div 
-            class="menu-item sub-menu-item" 
-            :class="{ active: activeTab === 'wheelRailAnalysis' }" 
-            @click="activeTab = 'wheelRailAnalysis'"
-          >
-            <div class="menu-icon">🔍</div>
-            <div class="menu-text">轮轨接触分析</div>
-          </div>
-        </div>
-        
-        <!-- 动力学安全评估部分 -->
-        <div class="menu-group">
-          <div class="menu-group-title">动力学安全评估</div>
-          <div 
-            class="menu-item sub-menu-item" 
-            :class="{ active: activeTab === 'dataAnalysis' }" 
-            @click="activeTab = 'dataAnalysis'"
-          >
-            <div class="menu-icon">📊</div>
-            <div class="menu-text">数据分析</div>
-          </div>
-          <div 
-            class="menu-item sub-menu-item" 
-            :class="{ active: activeTab === 'evaluationResults' }" 
-            @click="activeTab = 'evaluationResults'"
-          >
-            <div class="menu-icon">✅</div>
-            <div class="menu-text">评估结果</div>
+          <div v-if="!collapsedGroups.systemFunctions" class="menu-group-content">
+            <!-- 基础信息子分组 -->
+            <div class="menu-subgroup">
+              <div class="menu-group-title collapsible" @click="toggleGroup('baseInfo')">
+                <span>基础信息</span>
+                <span class="collapse-icon">{{ collapsedGroups.baseInfo ? '▶️' : '▼️' }}</span>
+              </div>
+              <div v-if="!collapsedGroups.baseInfo" class="menu-group-content">
+                <div 
+                  class="menu-item sub-menu-item" 
+                  @click="activeTab = 'settings'"
+                >
+                  <div class="menu-icon">⚙️</div>
+                  <div class="menu-text">系统设置</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  @click="activeTab = 'about'"
+                >
+                  <div class="menu-icon">ℹ️</div>
+                  <div class="menu-text">关于系统</div>
+                </div>
+                <div 
+                  class="menu-item sub-menu-item" 
+                  @click="activeTab = 'help'"
+                >
+                  <div class="menu-icon">❓</div>
+                  <div class="menu-text">帮助文档</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -115,6 +179,20 @@
           <h2>评估结果</h2>
           <p>此处将显示动力学安全评估结果</p>
         </div>
+        
+        <!-- 系统功能部分占位符 -->
+        <div v-if="activeTab === 'settings'" class="placeholder-content">
+          <h2>系统设置</h2>
+          <p>此处将显示系统设置内容</p>
+        </div>
+        <div v-if="activeTab === 'about'" class="placeholder-content">
+          <h2>关于系统</h2>
+          <p>此处将显示系统信息</p>
+        </div>
+        <div v-if="activeTab === 'help'" class="placeholder-content">
+          <h2>帮助文档</h2>
+          <p>此处将显示帮助文档内容</p>
+        </div>
       </div>
       
       <!-- 提交按钮 -->
@@ -155,6 +233,21 @@ const activeTab = ref('vehicle');
 // 侧边栏宽度
 const sidebarWidth = ref(240);
 const isResizing = ref(false);
+
+// 侧边栏折叠状态
+const collapsedGroups = ref({
+  projectFunctions: false,
+  systemFunctions: false,
+  dynamicsParams: false,
+  '3dScene': false,
+  safetyAssessment: false,
+  baseInfo: false
+});
+
+// 切换分组折叠状态
+const toggleGroup = (group) => {
+  collapsedGroups.value[group] = !collapsedGroups.value[group];
+};
 
 // 开始调整侧边栏大小
 const startResize = (e) => {
@@ -336,6 +429,46 @@ onUnmounted(() => {
   background-color: #f8f9fa;
   border-left: 3px solid #3498db;
   margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: default;
+}
+
+.menu-group-title.collapsible {
+  cursor: pointer;
+}
+
+.menu-group-title.collapsible:hover {
+  background-color: #e9ecef;
+}
+
+.collapse-icon {
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.menu-group-content {
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.menu-subgroup {
+  margin-bottom: 1.5rem;
+}
+
+.menu-subgroup .menu-group-title {
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+  margin-bottom: 0.25rem;
+  border-left-color: #6c757d;
+  background-color: #f1f3f5;
+  padding-left: 2rem; /* 增加左侧内边距实现缩进 */
+}
+
+/* 为子菜单项添加额外缩进 */
+.menu-subgroup .menu-group-content {
+  padding-left: 0.5rem;
 }
 
 /* 菜单项样式 */
@@ -352,6 +485,7 @@ onUnmounted(() => {
 
 .sub-menu-item {
   font-size: 0.95rem;
+  padding-left: 2.5rem; /* 增加左侧内边距实现更深的缩进 */
 }
 
 .menu-item:hover {

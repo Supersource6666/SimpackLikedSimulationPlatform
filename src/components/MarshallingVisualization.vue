@@ -114,6 +114,15 @@ onMounted(() => {
   // 创建列车
   createTrain(sceneInfo.scene, trackPath, trackLength)
   
+  // 添加光源
+  addLights()
+  
+  // 创建地面
+  createGround()
+  
+  // 添加网格辅助线
+  addGridHelper()
+  
   // 初始化小地图
   const minimapCanvas = document.getElementById('minimapCanvas')
   if (minimapCanvas) {
@@ -140,6 +149,10 @@ function animate() {
     // 更新列车位置
     updateTrainPosition(animationProgress.value)
   }
+  
+  // 更新轨道段（根据当前列车位置）
+  updateRailSegments(animationProgress.value, true) // 更新左侧轨道
+  updateRailSegments(animationProgress.value, false) // 更新右侧轨道
   
   // 更新控制器
   updateControls()
@@ -241,11 +254,13 @@ onUnmounted(() => {
 }
 
 .marshalling-info {
-  width: 300px;
+  width: 280px;
   background-color: white;
-  padding: 1.5rem;
+  padding: 0.5rem;
   box-shadow: -2px 0 4px rgba(0,0,0,0.1);
   overflow-y: auto;
+  margin-right: 5px;
+  margin-left: 5px;
 }
 
 .info-panel {
@@ -279,6 +294,30 @@ onUnmounted(() => {
 .speed-slider {
   flex: 1;
   margin: 0 0.5rem;
+}
+
+.minimap-container {
+  width: 280px;
+  height: 330px;
+  background-color: white;
+  padding: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 4px;
+}
+
+.minimap-container h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+#minimapCanvas {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  background-color: #f0f0f0;
 }
 </style>
 

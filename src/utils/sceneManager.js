@@ -36,45 +36,60 @@ export function initThreeScene(canvasContainer) {
 
 // 添加光源
 export function addLights() {
-  // 环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+  // 环境光 - 增强场景亮度
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
   scene.add(ambientLight)
   
-  // 平行光（模拟太阳光）
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-  directionalLight.position.set(50, 50, 50)
+  // 平行光（模拟太阳光） - 调整位置和强度以获得更好的阴影效果
+  const directionalLight = new THREE.DirectionalLight(0xffffcc, 1.0)
+  directionalLight.position.set(100, 100, 100)
   directionalLight.castShadow = true
   scene.add(directionalLight)
+  
+  // 添加补光 - 增强阴影区域的亮度
+  const fillLight = new THREE.DirectionalLight(0xccccff, 0.3)
+  fillLight.position.set(-100, 50, -100)
+  scene.add(fillLight)
   
   // 配置阴影贴图
   directionalLight.shadow.mapSize.width = 2048
   directionalLight.shadow.mapSize.height = 2048
-  directionalLight.shadow.camera.left = -100
-  directionalLight.shadow.camera.right = 100
-  directionalLight.shadow.camera.top = 100
-  directionalLight.shadow.camera.bottom = -100
+  directionalLight.shadow.camera.left = -200
+  directionalLight.shadow.camera.right = 200
+  directionalLight.shadow.camera.top = 200
+  directionalLight.shadow.camera.bottom = -200
   directionalLight.shadow.camera.near = 0.1
-  directionalLight.shadow.camera.far = 200
+  directionalLight.shadow.camera.far = 300
 }
 
 // 创建地面
 export function createGround() {
   const geometry = new THREE.PlaneGeometry(1000, 1000)
   const material = new THREE.MeshStandardMaterial({
-    color: 0x808080,
-    roughness: 0.8
+    color: 0x668866,
+    roughness: 0.9,
+    metalness: 0.1
   })
   const ground = new THREE.Mesh(geometry, material)
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
   
+  // 添加地面网格线，增强视觉效果
+  const groundGridHelper = new THREE.GridHelper(1000, 50, 0x446644, 0x446644)
+  //groundGridHelper.rotation.x = -Math.PI / 2 // 将网格线旋转到XOY平面
+  groundGridHelper.position.y = 0.01 // 确保网格线在地面上方
+  scene.add(groundGridHelper)
+  
   scene.add(ground)
   return ground
 }
 
-// 添加辅助网格
+// 添加辅助网格（只在地面平面显示）
 export function addGridHelper() {
   const gridHelper = new THREE.GridHelper(5000, 50, 0xcccccc, 0xeeeeee)
+  // 将网格线旋转到XOY平面，只显示地面方向的网格
+  // gridHelper.rotation.x = -Math.PI / 2
+  gridHelper.position.y = 0.02 // 确保在地面网格线上方
   scene.add(gridHelper)
   return gridHelper
 }

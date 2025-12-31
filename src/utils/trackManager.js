@@ -25,15 +25,34 @@ export function createTrackPathFromSegments(segments) {
     heading: 0 // 朝向角（弧度，0 表示 X 正方向）
   }
   
-  segments.forEach(seg => {
-    if (seg.type === 'line') {
-      addLineSegment(path, seg.length, trackState)
-    } else if (seg.type === 'arc') {
-      // 将角度从度转换为弧度
-      const angleRad = (seg.angle * Math.PI) / 180
-      addArcSegment(path, seg.radius, angleRad, trackState)
+  segments.forEach((seg, index) => {
+    try {
+      if (seg.type === 'line') {
+        addLineSegment(path, seg.length, trackState)
+      } else if (seg.type === 'arc') {
+        // 将角度从度转换为弧度
+        const angleRad = (seg.angle * Math.PI) / 180
+        addArcSegment(path, seg.radius, angleRad, trackState)
+      } else {
+        console.warn('createTrackPathFromSegments: Unknown segment type:', seg.type)
+      }
+    } catch (error) {
+      console.error('createTrackPathFromSegments: Error adding segment', index, seg, error)
     }
   })
+  
+  // 确保路径至少包含一个曲线段
+  if (path.curves.length === 0) {
+    console.error('createTrackPathFromSegments: No valid curves added to path')
+    // 添加一个默认的直线段避免崩溃
+    const defaultPath = new THREE.CurvePath()
+    const defaultState = {
+      position: new THREE.Vector3(0, 0, 0),
+      heading: 0
+    }
+    addLineSegment(defaultPath, 100, defaultState)
+    return defaultPath
+  }
   
   return path
 }
@@ -99,25 +118,74 @@ export function estimatePathLength(path) {
 export function createRailSegment(options = {}) {
   const { trackPath, startT, endT, offset = 0, color = 0x333333 } = options
   
+  // 添加防御性检查
+  if (!trackPath) {
+    console.error('createRailSegment: trackPath is null or undefined')
+    return new THREE.Mesh() // 返回空对象避免崩溃
+  }
+  
+  if (typeof startT !== 'number' || typeof endT !== 'number') {
+    console.error('createRailSegment: startT or endT is not a number', { startT, endT })
+    return new THREE.Mesh() // 返回空对象避免崩溃
+  }
+  
+  // 确保trackPath包含有效的曲线段
+  if (!trackPath.curves || trackPath.curves.length === 0) {
+    console.error('createRailSegment: trackPath has no curves')
+    return new THREE.Mesh() // 返回空对象避免崩溃
+  }
+  
   // 创建简单的钢轨轮廓（简化版）
   const railProfile = new THREE.Shape([
     new THREE.Vector2(-0.05, 0),
-    new THREE.Vector2(-0.05, 0.15),
-    new THREE.Vector2(0.05, 0.15),
-    new THREE.Vector2(0.05, 0)
+    new THREE.Vector2(0.05, 0),
+    new THREE.Vector2(0.05, 0.1),
+    new THREE.Vector2(-0.05, 0.1),
+    new THREE.Vector2(-0.05, 0)
   ])
   
   // 创建该段落的偏移路径
   const offsetPath = new THREE.CurvePath()
   const segments = Math.floor((endT - startT) * 200)
   
+  // 确保segments是有效的数字，最小为1
+  if (isNaN(segments) || segments <= 0) {
+    console.warn('createRailSegment: Invalid segments count, using minimum value 1:', segments)
+    segments = 1
+  }
+  
   for (let i = 0; i <= segments; i++) {
     const t = startT + (endT - startT) * (i / segments)
-    const point = trackPath.getPoint(t)
+    
+    // 获取点
+    let point = null
+    try {
+      point = trackPath.getPoint(t)
+      if (!point) {
+        console.error('createRailSegment: Failed to get point at t =', t)
+        continue
+      }
+    } catch (error) {
+      console.error('createRailSegment: Error getting point at t =', t, error)
+      continue
+    }
     
     // 获取切线
-    let tangent = trackPath.getTangentAt(t)
-    tangent = tangent.normalize()
+    let tangent = null
+    try {
+      tangent = trackPath.getTangentAt(t)
+      if (!tangent || !tangent.normalize) {
+        console.error('createRailSegment: Failed to get valid tangent at t =', t)
+        // 使用默认方向避免崩溃
+        tangent = new THREE.Vector3(1, 0, 0)
+      } else {
+        tangent = tangent.normalize()
+      }
+    } catch (error) {
+      console.error('createRailSegment: Error getting tangent at t =', t, error)
+      // 使用默认方向避免崩溃
+      tangent = new THREE.Vector3(1, 0, 0)
+    }
     
     // 计算垂直于切线的方向
     const normal = new THREE.Vector3(
@@ -144,30 +212,66 @@ export function createRailSegment(options = {}) {
     extrudePath: offsetPath
   }
   
-  const geometry = new THREE.ExtrudeGeometry(railProfile, extrudeSettings)
-  const material = new THREE.MeshStandardMaterial({
-    color: color,
-    metalness: 0.5,
-    roughness: 0.3
-  })
+  let geometry = null
+  let railSegment = null
   
-  const railSegment = new THREE.Mesh(geometry, material)
-  railSegment.castShadow = true
-  railSegment.receiveShadow = true
-  railSegment.userData = {
-    startT,
-    endT,
-    length: (endT - startT) * trackLength
+  try {
+    // 检查railProfile是否有效
+    if (!railProfile || !railProfile.curves || railProfile.curves.length === 0) {
+      console.error('createRailSegment: railProfile is invalid')
+      return new THREE.Mesh()
+    }
+    
+    // 检查offsetPath是否有效
+    if (!offsetPath || !offsetPath.curves || offsetPath.curves.length === 0) {
+      console.error('createRailSegment: offsetPath is invalid or empty')
+      return new THREE.Mesh()
+    }
+    
+    geometry = new THREE.ExtrudeGeometry(railProfile, extrudeSettings)
+    const material = new THREE.MeshStandardMaterial({
+      color: color,
+      metalness: 0.5,
+      roughness: 0.3
+    })
+    
+    railSegment = new THREE.Mesh(geometry, material)
+    railSegment.castShadow = true
+    railSegment.receiveShadow = true
+    railSegment.userData = {
+      startT,
+      endT,
+      length: (endT - startT) * trackLength
+    }
+  } catch (error) {
+    console.error('createRailSegment: Error creating rail segment geometry', error)
+    railSegment = new THREE.Mesh() // 返回空对象避免崩溃
   }
   
   return railSegment
 }
 
-// 更新轨道段（根据当前列车位置）
+// 更新轨道段
 export function updateRailSegments(currentT, isLeftRail = true) {
   const cache = isLeftRail ? cachedRailSegments.rail1 : cachedRailSegments.rail2
   const railRoot = isLeftRail ? rail1 : rail2
   const offset = isLeftRail ? 1.435 / 2 : -1.435 / 2 // 标准轨距的一半
+  
+  // 添加防御性检查
+  if (!trackPath) {
+    console.error('updateRailSegments: trackPath is null or undefined')
+    return
+  }
+  
+  if (!trackLength || trackLength <= 0) {
+    console.error('updateRailSegments: trackLength is invalid', trackLength)
+    return
+  }
+  
+  if (typeof currentT !== 'number') {
+    console.error('updateRailSegments: currentT is not a number', currentT)
+    return
+  }
   
   // 计算需要保留的轨道段范围
   const segmentSpacing = 1 / trackLength * segmentLength // 每个段落在0-1路径参数中的占比
@@ -216,9 +320,13 @@ export function updateRailSegments(currentT, isLeftRail = true) {
   // 创建新的轨道段
   segmentsToKeep.forEach(key => {
     // 检查该段是否已经存在
-    const exists = cache.some(segment => 
-      `${segment.userData.startT.toFixed(4)}-${segment.userData.endT.toFixed(4)}` === key
-    )
+    const exists = cache.some(segment => {
+      // 确保segment.userData存在且startT和endT是有效的数字
+      if (!segment.userData || typeof segment.userData.startT !== 'number' || typeof segment.userData.endT !== 'number') {
+        return false
+      }
+      return `${segment.userData.startT.toFixed(4)}-${segment.userData.endT.toFixed(4)}` === key
+    })
     
     if (!exists) {
       const [startT, endT] = key.split('-').map(Number)
@@ -275,8 +383,20 @@ export function createTrack(scene) {
   // 从trackStore获取轨道段数据
   const horizontalSegments = trackStore.getHorizontalSegments()
   
+  // 确保有轨道段数据
+  if (!horizontalSegments || horizontalSegments.length === 0) {
+    console.error('createTrack: No horizontal segments found in trackStore')
+    return { trackPath: null, trackLength: 0 }
+  }
+  
   // 创建轨道基准路径
   trackPath = createTrackPathFromSegments(horizontalSegments)
+  
+  // 确保路径创建成功
+  if (!trackPath || !trackPath.getPoint) {
+    console.error('createTrack: Failed to create valid trackPath')
+    return { trackPath: null, trackLength: 0 }
+  }
   
   // 计算轨道长度
   trackLength = estimatePathLength(trackPath)

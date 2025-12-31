@@ -62,22 +62,66 @@ export function drawMinimap(camera, trains) {
     minimapCtx.strokeStyle = '#333333'
     minimapCtx.lineWidth = 2
     
-    const segments = 1000 // 绘制精度，值越高越平滑但性能越差
+    const segments = 2000 // 增加绘制精度，确保边界框计算准确
     minimapCtx.beginPath()
+    
+    // 计算轨道的边界框，用于自动调整地图中心
+    let minX = Infinity, maxX = -Infinity
+    let minZ = Infinity, maxZ = -Infinity
     
     for (let i = 0; i <= segments; i++) {
       const t = i / segments
       const point = trackPath.getPoint(t)
-      const coords = worldToMinimapCoords(point.x, point.z)
-      
-      if (i === 0) {
-        minimapCtx.moveTo(coords.x, coords.y)
-      } else {
-        minimapCtx.lineTo(coords.x, coords.y)
+      if (point) {
+        minX = Math.min(minX, point.x)
+        maxX = Math.max(maxX, point.x)
+        minZ = Math.min(minZ, point.z)
+        maxZ = Math.max(maxZ, point.z)
       }
     }
     
-    minimapCtx.stroke()
+    // 检查是否成功计算了边界框
+    if (minX === Infinity) {
+      console.error('小地图：无法计算轨道边界框')
+      return
+    }
+    
+    // 自动设置地图中心为轨道的几何中心
+    mapCenter.x = (minX + maxX) / 2
+    mapCenter.y = (minZ + maxZ) / 2
+    
+    // 计算合适的缩放比例，确保整个轨道能在小地图内显示
+    const trackWidth = maxX - minX
+    const trackHeight = maxZ - minZ
+    const margin = 60 // 增加边距，确保轨道完全显示
+    const mapWidth = minimapSize.width - margin
+    const mapHeight = minimapSize.height - margin
+    
+    // 根据轨道的最大尺寸调整缩放比例，并确保至少有一定的缩放比例
+    const scaleX = mapWidth / trackWidth
+    const scaleY = mapHeight / trackHeight
+    minimapScale = Math.min(scaleX, scaleY) * 0.9 // 再缩小10%，确保完全显示
+    
+    // 绘制轨道路径
+    let firstPoint = true
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments
+      const point = trackPath.getPoint(t)
+      if (point) {
+        const coords = worldToMinimapCoords(point.x, point.z)
+        
+        if (firstPoint) {
+          minimapCtx.moveTo(coords.x, coords.y)
+          firstPoint = false
+        } else {
+          minimapCtx.lineTo(coords.x, coords.y)
+        }
+      }
+    }
+    
+    if (!firstPoint) {
+      minimapCtx.stroke()
+    }
   }
   
   // 绘制列车
