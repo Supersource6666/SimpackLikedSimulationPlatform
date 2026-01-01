@@ -5,20 +5,27 @@
       <div class="nav-title">仿真可视化系统</div>
       <div class="nav-links">
         <router-link to="/" class="nav-link">参数设置</router-link>
-        <router-link to="/track" class="nav-link">轨道视图</router-link>
+        <router-link to="/track" class="nav-link">轮轨接触分析</router-link>
         <router-link to="/marshalling-visualization" class="nav-link">编组可视化</router-link>
       </div>
     </nav>
     
-    <!-- 路由视图 -->
-    <main class="app-main">
-      <router-view></router-view>
-    </main>
+    <!-- 主内容区域 -->
+    <div class="app-content">
+      <!-- 侧边栏 -->
+      <Sidebar />
+      
+      <!-- 路由视图 -->
+      <main class="app-main">
+        <router-view></router-view>
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import Sidebar from './components/Sidebar.vue'
 </script>
 
 <style scoped>
@@ -67,6 +74,12 @@ import { ref } from 'vue'
 
 .app-main {
   flex: 1;
+  overflow: hidden;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
   overflow: hidden;
 }
 </style>

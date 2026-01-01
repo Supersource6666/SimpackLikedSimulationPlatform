@@ -54,6 +54,14 @@ defineExpose({
   padding: 20px;
 }
 
+.operation-params h2 {
+  color: #000000;
+}
+
+.operation-params p {
+  color: #000000;
+}
+
 .params-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
