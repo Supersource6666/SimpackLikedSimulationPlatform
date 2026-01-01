@@ -51,7 +51,7 @@
 
 2. 启动服务器
    ```bash
-   python main.py
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000
    ```
 
 ## 访问方式
