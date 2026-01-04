@@ -25,14 +25,12 @@
           <h2>轮轨接触分析</h2>
           <p>此处将显示轮轨接触分析的三维可视化内容</p>
         </div>
-        <div v-if="activeTab === 'dataAnalysis'" class="placeholder-content">
-          <h2>数据分析</h2>
-          <p>此处将显示动力学数据分析内容</p>
-        </div>
-        <div v-if="activeTab === 'evaluationResults'" class="placeholder-content">
-          <h2>评估结果</h2>
-          <p>此处将显示动力学安全评估结果</p>
-        </div>
+        <DataAnalysis 
+          v-if="activeTab === 'dataAnalysis'" 
+        />
+        <EvaluationResults 
+          v-if="activeTab === 'evaluationResults'" 
+        />
         
         <!-- 系统功能部分占位符 -->
         <div v-if="activeTab === 'settings'" class="placeholder-content">
@@ -66,6 +64,8 @@ import { trackStore } from '../store/trackStore.js';
 import VehicleParams from './VehicleParams.vue';
 import TrackParams from './TrackParams.vue';
 import OperationParams from './OperationParams.vue';
+import DataAnalysis from './DataAnalysis.vue';
+import EvaluationResults from './EvaluationResults.vue';
 
 const router = useRouter();
 const route = useRoute();

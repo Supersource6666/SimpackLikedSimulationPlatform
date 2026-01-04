@@ -146,7 +146,7 @@ export function createRailSegment(options = {}) {
   
   // 创建该段落的偏移路径
   const offsetPath = new THREE.CurvePath()
-  const segments = Math.floor((endT - startT) * 200)
+  let segments = Math.floor((endT - startT) * 200)
   
   // 确保segments是有效的数字，最小为1
   if (isNaN(segments) || segments <= 0) {

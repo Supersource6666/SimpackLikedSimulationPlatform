@@ -63,7 +63,15 @@
                 @click="navigate('/track')"
               >
                 <div class="menu-icon">🔍</div>
-                <div class="menu-text">轮轨接触分析</div>
+                <div class="menu-text">轨道可视化</div>
+              </div>
+              <div 
+                class="menu-item sub-menu-item" 
+                :class="{ active: currentRoute === '/wheel-rail-contact' }" 
+                @click="navigate('/wheel-rail-contact')"
+              >
+                <div class="menu-icon">🚂</div>
+                <div class="menu-text">轮对沿轨道运行</div>
               </div>
             </div>
           </div>
@@ -77,16 +85,16 @@
             <div v-if="!collapsedGroups.safetyAssessment" class="menu-group-content">
               <div 
                 class="menu-item sub-menu-item" 
-                :class="{ active: currentRoute === '/' }" 
-                @click="navigate('/')"
+                :class="{ active: currentRoute === '/' && currentTab === 'dataAnalysis' }" 
+                @click="navigate('/', 'dataAnalysis')"
               >
                 <div class="menu-icon">📊</div>
                 <div class="menu-text">数据分析</div>
               </div>
               <div 
                 class="menu-item sub-menu-item" 
-                :class="{ active: currentRoute === '/' }" 
-                @click="navigate('/')"
+                :class="{ active: currentRoute === '/' && currentTab === 'evaluationResults' }" 
+                @click="navigate('/', 'evaluationResults')"
               >
                 <div class="menu-icon">✅</div>
                 <div class="menu-text">评估结果</div>
