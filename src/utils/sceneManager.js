@@ -16,8 +16,8 @@ export function initThreeScene(canvasContainer) {
     0.1,
     10000
   )
-  camera.position.set(0, 50, 100)
-  camera.lookAt(0, 0, 0)
+  camera.position.set(40, 20, 60) // 调大相机位置，增加与模型的距离
+  camera.lookAt(10, 5, 0) // 看向模型区域
   
   // 创建渲染器
   renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -115,12 +115,12 @@ export function followTrain(trains) {
   train.getWorldDirection(trainDirection)
   
   // 计算目标相机位置：列车后方上方
-  const cameraOffset = new THREE.Vector3(-15, 10, -30) // 调整这个偏移量可以改变相机视角
+  const cameraOffset = new THREE.Vector3(-60, 20, -60) // 调大相机偏移量，增加与列车的距离
   const rotatedOffset = cameraOffset.applyQuaternion(train.quaternion)
   const targetCameraPosition = trainPosition.clone().add(rotatedOffset)
   
-  // 计算目标看向点：列车前方一点
-  const targetLookAtPoint = trainPosition.clone().add(trainDirection.multiplyScalar(10))
+  // 计算目标看向点：列车前方更远的位置
+  const targetLookAtPoint = trainPosition.clone().add(trainDirection.multiplyScalar(20)) // 增加看向点距离
   
   // 平滑插值移动相机 - 0.1是插值因子，值越小过渡越平滑但反应越慢
   const lerpFactor = 0.1

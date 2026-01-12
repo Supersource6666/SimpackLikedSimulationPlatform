@@ -16,7 +16,7 @@ const initialVerticalSegments = [
 const initialVehicleParams = {
   // 编组参数
   trainCount: 2, // 车辆数量
-  trainSpacing: 7, // 车车间距
+  trainSpacing: 20, // 车车间距（增大以提供足够间隔）
   marshallingType: 'locomotive-pull', // 编组类型
   
   name: '',

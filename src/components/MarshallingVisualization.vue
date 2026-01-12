@@ -99,10 +99,12 @@ function resetPosition() {
 
 // 组件挂载时初始化
 onMounted(() => {
+  console.log('开始初始化编组可视化')
   // 初始化Three.js场景
   sceneInfo = initThreeScene(canvasContainer.value)
   
   // 创建轨道
+  console.log('创建轨道')
   const { trackPath: newTrackPath, trackLength: newTrackLength } = createTrack(sceneInfo.scene)
   trackPath = newTrackPath
   trackLength = newTrackLength
@@ -112,15 +114,20 @@ onMounted(() => {
   setTrackPath(trackPath)
   
   // 创建列车
+  console.log('创建列车')
   createTrain(sceneInfo.scene, trackPath, trackLength)
+  console.log('列车创建完成')
   
   // 添加光源
+  console.log('添加光源')
   addLights()
   
   // 创建地面
+  console.log('创建地面')
   createGround()
   
   // 添加网格辅助线
+  console.log('添加网格辅助线')
   addGridHelper()
   
   // 初始化小地图
@@ -132,6 +139,7 @@ onMounted(() => {
   }
   
   // 开始动画循环
+  console.log('开始动画循环')
   animate()
 })
 

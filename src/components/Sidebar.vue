@@ -70,8 +70,8 @@
                 :class="{ active: currentRoute === '/wheel-rail-contact' }" 
                 @click="navigate('/wheel-rail-contact')"
               >
-                <div class="menu-icon">🚂</div>
-                <div class="menu-text">轮对沿轨道运行</div>
+                <div class="menu-icon">🔍</div>
+                <div class="menu-text">轮轨接触分析</div>
               </div>
             </div>
           </div>

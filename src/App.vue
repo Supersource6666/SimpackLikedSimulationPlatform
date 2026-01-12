@@ -5,7 +5,7 @@
       <div class="nav-title">仿真可视化系统</div>
       <div class="nav-links">
         <router-link to="/" class="nav-link">参数设置</router-link>
-        <router-link to="/track" class="nav-link">轮轨接触分析</router-link>
+        <router-link to="/wheel-rail-contact" class="nav-link">轮轨接触分析</router-link>
         <router-link to="/marshalling-visualization" class="nav-link">编组可视化</router-link>
       </div>
     </nav>
