@@ -14,7 +14,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
   trackLength = trackLengthRef
   
   // 获取车辆参数
-  const vehicleParams = getVehicleParams()
+  const vehicleParams = trackStore.getVehicleParams()
   const { trainCount } = vehicleParams
   
   // 清空现有车体
@@ -27,7 +27,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
   for (let i = 0; i < trainCount; i++) {
     // 决定使用哪个模型
     const isFirst = i === 0
-    const isLast = i === trainCount - 1
+    const isLast = i === trainCount - 1 && trainCount >= 3 // 只有当车辆数量≥3时，最后一节车才使用motor_car_transparent.glb
     const modelPath = (isFirst || isLast) 
       ? '/models_3d/motor_car_transparent.glb' 
       : '/models_3d/traction_car_transparent.glb'
@@ -67,7 +67,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
           trainModel.rotation.y = Math.PI / 2
         }
         
-        trainModel.position.set(carIndex * 40, 1.5, 0) // 沿X轴排列模型，增大间隔为40
+        trainModel.position.set((trainCount - 1 - carIndex) * -40, 1.5, 0) // 最后一辆车在原点，倒数第二辆沿x轴向前车长逐次递增
         trainModel.castShadow = true
         
         scene.add(trainModel)
@@ -95,7 +95,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
         })
         const fallbackTrain = new THREE.Mesh(fallbackGeometry, fallbackMaterial)
         fallbackTrain.castShadow = true
-        fallbackTrain.position.set(carIndex * 40, 1.5, 0) // 沿X轴排列，增大间隔为40
+        fallbackTrain.position.set((trainCount - 1 - carIndex) * -40, 1.5, 0) // 最后一辆车在原点，倒数第二辆沿x轴向前车长逐次递增
         
         // 根据车辆位置设置备用模型朝向
         if (carIsFirst) {
@@ -133,7 +133,7 @@ export function updateTrainPosition(progress) {
   progress = Math.max(0, Math.min(1, progress))
   
   // 获取车辆参数
-  const { trainSpacing } = getVehicleParams()
+  const { trainSpacing } = trackStore.getVehicleParams()
   
   // 计算每节车厢之间的间距比例，确保多节车状态下有足够的轴向间隔
   // 对于多节车，需要确保间距足够大以避免车辆重叠
