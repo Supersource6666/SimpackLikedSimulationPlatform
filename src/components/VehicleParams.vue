@@ -1,6 +1,6 @@
 <template>
   <div class="vehicle-params">
-    <h2>车辆参数设置</h2>
+    <h2>车辆动力学参数</h2>
     
     <!-- Tab切换组件 -->
     <div class="tabs">
@@ -55,7 +55,7 @@
       <!-- 车体参数Tab -->
       <div v-if="activeTab === 'body'" class="tab-pane">
         <div class="params-form">
-          <div class="form-group">
+          <!-- <div class="form-group">
             <label for="vehicle-name">车辆名称</label>
             <input 
               id="vehicle-name"
@@ -63,14 +63,13 @@
               type="text" 
               placeholder="请输入车辆名称"
             />
-          </div>
+          </div> -->
           
           <div class="form-group">
             <label for="vehicle-type">车辆类型</label>
             <select id="vehicle-type" v-model="vehicleParams.type">
-              <option value="train">列车</option>
-              <option value="car">汽车</option>
-              <option value="other">其他</option>
+              <option value="a-series">A系车</option>
+              <option value="b-series">B系车</option>
             </select>
           </div>
           
@@ -255,7 +254,7 @@ const vehicleParams = reactive({
   
   // 车体参数
   name: '',
-  type: 'train',
+  type: 'a-series',
   weight: 100,
   length: 25.0,
   width: 3.1,
@@ -263,9 +262,9 @@ const vehicleParams = reactive({
   capacity: 1000,
   
   // 转向架参数
-  axles: 8,
+  axles: 2,
   bogieCount: 2,
-  wheelbase: 20.0,
+  wheelbase: 17.5,
   bogieWheelbase: 2.5,
   
   // 车轮与踏面配置

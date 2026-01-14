@@ -4,7 +4,7 @@
       <div ref="canvasContainer" class="canvas-container"></div>
       <div class="controls-container">
         <button id="exportBtn" @click="exportGLTF">导出GLB模型</button>
-        <button id="paramsBtn" @click="goToParams">参数设置</button>
+        <button id="paramsBtn" @click="goToParams">动力学参数</button>
       </div>
     </div>
     <div class="side-panel">
@@ -35,7 +35,7 @@ import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
+import { exportRailTrack } from '../utils/modelHelper'
 
 const canvasContainer = ref(null)
 const router = useRouter()
@@ -43,7 +43,7 @@ const router = useRouter()
 // 引入轨道参数状态管理
 import { trackStore } from '../store/trackStore'
 
-// 跳转到参数设置界面
+// 跳转到动力学参数界面
 function goToParams() {
   router.push('/')
 }
@@ -771,33 +771,7 @@ function drawVerticalRailTrajectory() {
 
 // 导出GLTF模型
 function exportGLTF() {
-  const exporter = new GLTFExporter();
-  const gltfOptions = {
-    trs: false,
-    onlyVisible: true,
-    truncateDrawRange: true,
-    binary: true,
-    maxTextureSize: 4096
-  };
-  
-  // 创建包含所有钢轨的组
-  const railGroup = new THREE.Group();
-  if (rail1) railGroup.add(rail1);
-  if (rail2) railGroup.add(rail2);
-  
-  exporter.parse(railGroup, (gltf) => {
-    if (gltf instanceof ArrayBuffer) {
-      const blob = new Blob([gltf], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'rail_track.glb';
-      link.click();
-      URL.revokeObjectURL(url);
-    }
-  }, (error) => {
-    console.error('导出错误:', error);
-  }, gltfOptions);
+  exportRailTrack(rail1, rail2);
 }
 
 // 更新轨道函数

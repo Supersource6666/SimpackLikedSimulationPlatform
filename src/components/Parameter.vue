@@ -18,7 +18,7 @@
         />
         <!-- 新增内容占位符 -->
         <div v-if="activeTab === 'trainVisualization'" class="placeholder-content">
-          <h2>列车编组可视化</h2>
+          <h2>列车实时运行</h2>
           <p>此处将显示列车编组的三维可视化内容</p>
         </div>
         <div v-if="activeTab === 'wheelRailAnalysis'" class="placeholder-content">
@@ -95,10 +95,10 @@ const saveAllParams = async () => {
         const vehicleParams = vehicleParamsRef.value.getVehicleParams();
         
         // 简单校验车辆参数
-        if (!vehicleParams || !vehicleParams.name || !vehicleParams.type) {
-          alert('请先填写车辆名称和类型');
-          return;
-        }
+        // if (!vehicleParams || !vehicleParams.name || !vehicleParams.type) {
+        //   alert('请先填写车辆名称和类型');
+        //   return;
+        // }
         
         trackStore.setVehicleParams(vehicleParams);
         console.log('车辆参数保存成功');
@@ -167,7 +167,7 @@ const saveAllParams = async () => {
 
 // 组件挂载
 onMounted(() => {
-  console.log('参数设置页面已加载');
+  console.log('动力学参数页面已加载');
 });
 </script>
 

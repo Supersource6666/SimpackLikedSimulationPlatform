@@ -1,6 +1,6 @@
 <template>
   <div class="operation-params">
-    <h2>运行参数设置</h2>
+    <h2>动力学运行参数</h2>
     <p>设置车辆的运行参数</p>
     <div class="params-grid">
       <div class="param-card">
@@ -34,7 +34,7 @@
 import { ref } from 'vue'
 
 const params = ref({
-  initialSpeed: 0,
+  initialSpeed: 3,
   maxSpeed: 10
 })
 
@@ -83,6 +83,7 @@ defineExpose({
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
+  color: #000000;
 }
 
 .param-group input {

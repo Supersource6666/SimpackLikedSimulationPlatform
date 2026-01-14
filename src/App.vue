@@ -2,11 +2,11 @@
   <div class="app-container">
     <!-- 导航栏 -->
     <nav class="app-nav">
-      <div class="nav-title">仿真可视化系统</div>
+      <div class="nav-title">可视化分析平台</div>
       <div class="nav-links">
-        <router-link to="/" class="nav-link">参数设置</router-link>
+        <router-link to="/" class="nav-link">动力学参数</router-link>
         <router-link to="/wheel-rail-contact" class="nav-link">轮轨接触分析</router-link>
-        <router-link to="/marshalling-visualization" class="nav-link">编组可视化</router-link>
+        <router-link to="/marshalling-visualization" class="nav-link">列车实时运行</router-link>
       </div>
     </nav>
     

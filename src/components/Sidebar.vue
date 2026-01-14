@@ -55,15 +55,15 @@
                 @click="navigate('/marshalling-visualization')"
               >
                 <div class="menu-icon">🔄</div>
-                <div class="menu-text">列车编组可视化</div>
+                <div class="menu-text">列车实时运行</div>
               </div>
               <div 
                 class="menu-item sub-menu-item" 
                 :class="{ active: currentRoute === '/track' }" 
                 @click="navigate('/track')"
               >
-                <div class="menu-icon">🔍</div>
-                <div class="menu-text">轨道可视化</div>
+                <div class="menu-icon">🔭</div>
+                <div class="menu-text">线路环境预览</div>
               </div>
               <div 
                 class="menu-item sub-menu-item" 

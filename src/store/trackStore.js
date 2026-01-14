@@ -16,14 +16,14 @@ const initialVerticalSegments = [
 const initialVehicleParams = {
   // 编组参数
   trainCount: 2, // 车辆数量
-  trainSpacing: 20, // 车车间距（增大以提供足够间隔）
+  trainSpacing: 28, // 车车间距（米），进一步缩小
   marshallingType: 'locomotive-pull', // 编组类型
   
   name: '',
-  type: 'train',
+  type: 'a-series',
   weight: 100,
   maxSpeed: 120,
-  axles: 8,
+  axles: 2,
   powerType: 'electric',
   maxPower: 4000,
   traction: 200,
