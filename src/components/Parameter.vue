@@ -154,9 +154,9 @@ const saveAllParams = async () => {
         trackStore.setOperationParams(operationParams);
         console.log('运行参数保存成功');
         
-        // 导航到编组可视化视图
-        console.log('所有参数保存成功，导航到编组可视化视图...');
-        router.push('/marshalling-visualization');
+        // 导航到轮轨接触分析视图
+        console.log('所有参数保存成功，导航到轮轨接触分析视图...');
+        router.push('/wheel-rail-contact');
       }
     }
   } catch (error) {

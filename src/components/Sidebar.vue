@@ -51,15 +51,6 @@
             <div v-if="!collapsedGroups['3dScene']" class="menu-group-content">
               <div 
                 class="menu-item sub-menu-item" 
-                :class="{ active: currentRoute === '/marshalling-visualization' }" 
-                @click="navigate('/marshalling-visualization')"
-              >
-                <div class="menu-icon">🔄</div>
-                <div class="menu-text">列车实时运行</div>
-              </div>
-
-              <div 
-                class="menu-item sub-menu-item" 
                 :class="{ active: currentRoute === '/wheel-rail-contact' }" 
                 @click="navigate('/wheel-rail-contact')"
               >

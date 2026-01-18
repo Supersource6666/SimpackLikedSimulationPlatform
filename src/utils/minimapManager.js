@@ -2,7 +2,7 @@ import * as THREE from 'three'
 
 let minimapCanvas = null
 let minimapCtx = null
-let minimapSize = { width: 300, height: 300 }
+let minimapSize = { width: 200, height: 200 }
 let minimapScale = 0.5
 let mapCenter = { x: 0, y: 0 }
 let trackPath = null
@@ -11,8 +11,9 @@ let trackPath = null
 export function initMinimap(canvas) {
   minimapCanvas = canvas
   minimapCtx = minimapCanvas.getContext('2d')
-  minimapCanvas.width = minimapSize.width
-  minimapCanvas.height = minimapSize.height
+  // 使用canvas的实际大小
+  minimapSize.width = canvas.width
+  minimapSize.height = canvas.height
   minimapCanvas.style.border = '1px solid #ddd'
   
   return { minimapCanvas, minimapCtx }
@@ -57,9 +58,9 @@ export function drawMinimap(camera, trains) {
   minimapCtx.clearRect(0, 0, minimapSize.width, minimapSize.height)
   
   // 绘制轨道
-  if (trackPath) {
-    minimapCtx.strokeStyle = '#333333'
-    minimapCtx.lineWidth = 2
+    if (trackPath) {
+      minimapCtx.strokeStyle = '#c87dd7'
+      minimapCtx.lineWidth = 2
     
     const segments = 2000 // 增加绘制精度，确保边界框计算准确
     minimapCtx.beginPath()

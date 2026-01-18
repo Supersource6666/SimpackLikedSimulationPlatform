@@ -2,42 +2,66 @@
   <div class="wheel-rail-contact-container">
     <div class="viewer-container">
       <div class="controls-container">
-        <el-button @click="toggleAnimation">{{ isAnimating ? '停止运行' : '开始运行' }}</el-button>
-        <el-button @click="resetAnimation">重置位置</el-button>
-        <div class="chart-buttons">
-          <button class="speed-button" :class="{ 'active': showWheelRailForceChart }" @click="toggleWheelRailForceChart">轮轨力</button>
-          <button class="speed-button" :class="{ 'active': showWheelLoadReductionChart }" @click="toggleWheelLoadReductionChart">轮重减载率</button>
-          <button class="speed-button" :class="{ 'active': showDerailmentCoefficientChart }" @click="toggleDerailmentCoefficientChart">脱轨系数</button>
+        <h3 class="section-title">轮轨接触分析</h3>
+        <div class="buttons-and-selector">
+          <el-button @click="toggleAnimation">{{ isAnimating ? '停止运行' : '开始运行' }}</el-button>
+          <el-button @click="resetAnimation">重置位置</el-button>
+          <div class="view-selector">
+            <select v-model="currentView" class="view-select-dropdown">
+              <option value="main">主视角</option>
+              <option value="axle1-position1">一轴左轮</option>
+              <option value="axle1-position2">一轴右轮</option>
+              <option value="axle2-position1">二轴左轮</option>
+              <option value="axle2-position2">二轴右轮</option>
+              <option value="axle3-position1">三轴左轮</option>
+              <option value="axle3-position2">三轴右轮</option>
+              <option value="axle4-position1">四轴左轮</option>
+              <option value="axle4-position2">四轴右轮</option>
+            </select>
+          </div>
         </div>
       </div>
       <div ref="canvasContainer" class="canvas-container"></div>
       
       <!-- 固定位置的曲线图窗 -->
       <div class="chart-windows">
-        <div v-if="showWheelRailForceChart" class="chart-window">
-          <h4>轮轨力</h4>
-          <div ref="wheelRailForceChartRef" class="chart"></div>
+        <!-- 图表控制按钮 -->
+        <div class="chart-controls">
+          <button class="speed-button" :class="{ 'active': showWheelRailForceChart }" @click="toggleWheelRailForceChart">轮轨力</button>
+          <button class="speed-button" :class="{ 'active': showWheelLoadReductionChart }" @click="toggleWheelLoadReductionChart">轮重减载率</button>
+          <button class="speed-button" :class="{ 'active': showDerailmentCoefficientChart }" @click="toggleDerailmentCoefficientChart">脱轨系数</button>
         </div>
-        <div v-if="showWheelLoadReductionChart" class="chart-window">
-          <h4>轮重减载率</h4>
-          <div ref="wheelLoadReductionChartRef" class="chart"></div>
-        </div>
-        <div v-if="showDerailmentCoefficientChart" class="chart-window">
-          <h4>脱轨系数</h4>
-          <div ref="derailmentCoefficientChartRef" class="chart"></div>
+        
+        <!-- 图表窗口容器 -->
+        <div class="chart-window-container">
+          <div v-if="showWheelRailForceChart" class="chart-window">
+            <div class="chart-window-header">
+              <h4>轮轨力</h4>
+              <button class="close-button" @click="toggleWheelRailForceChart">×</button>
+            </div>
+            <div ref="wheelRailForceChartRef" class="chart"></div>
+          </div>
+          <div v-if="showWheelLoadReductionChart" class="chart-window">
+            <div class="chart-window-header">
+              <h4>轮重减载率</h4>
+              <button class="close-button" @click="toggleWheelLoadReductionChart">×</button>
+            </div>
+            <div ref="wheelLoadReductionChartRef" class="chart"></div>
+          </div>
+          <div v-if="showDerailmentCoefficientChart" class="chart-window">
+            <div class="chart-window-header">
+              <h4>脱轨系数</h4>
+              <button class="close-button" @click="toggleDerailmentCoefficientChart">×</button>
+            </div>
+            <div ref="derailmentCoefficientChartRef" class="chart"></div>
+          </div>
         </div>
       </div>
       
       <!-- 固定位置的小地图 -->
       <div class="minimap-fixed">
-        <h4>列车轨迹小地图</h4>
-        <canvas id="minimapCanvas" width="300" height="300"></canvas>
-      </div>
-      
-      <!-- 固定位置的列车实时运行视窗 -->
-      <div class="realtime-view-fixed" @click="navigateToMarshallingVisualization">
-        <h4>列车实时运行</h4>
-        <div ref="realtimeViewContainer" class="realtime-view"></div>
+        <h4>运行轨迹</h4>
+        <canvas id="minimapCanvas" width="200" height="200"></canvas>
       </div>
     </div>
   </div>
@@ -45,24 +69,19 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { trackStore } from '../store/trackStore'
 import { createTrackPathFromSegments, estimatePathLength } from '../utils/trackManager'
 import { initMinimap, updateMinimap, setTrackPath } from '../utils/minimapManager'
-import { initThreeScene, renderScene, followTrain } from '../utils/sceneManager'
 import { createTrack as createManagerTrack, updateRailSegments, getTrackState } from '../utils/trackManager'
 import { createTrain, updateTrainPosition, getTrains, setTrackInfo } from '../utils/trainManager'
 import * as echarts from 'echarts'
 import { webSocketAPI } from '../utils/api'
 
 const canvasContainer = ref(null)
-let realtimeViewContainer = ref(null)
-const router = useRouter()
 let scene, camera, renderer, controls
-let realtimeSceneInfo = null
 let trackPath, trackLength
 let baseTrackPath, leftTrackPath, rightTrackPath
 let leftRail, rightRail
@@ -73,6 +92,7 @@ let fourthWheelSet, fourthWheels
 let sleepers = []
 let bogie = null
 let secondBogie = null
+let contactArrows = [] // 存储轮轨接触点箭头
 
 // 图表引用
 const wheelLoadReductionChartRef = ref(null)
@@ -83,6 +103,162 @@ const wheelRailForceChartRef = ref(null)
 const showWheelRailForceChart = ref(true)
 const showWheelLoadReductionChart = ref(true)
 const showDerailmentCoefficientChart = ref(true)
+
+// 视角选择
+const currentView = ref('main')
+
+// 监听视角变化
+watch(currentView, (newView) => {
+  switchView(newView)
+})
+
+// 切换视角
+function switchView(viewType) {
+  if (!camera || !controls) return
+  
+  // 计算目标轮对位置
+  let targetPosition = new THREE.Vector3(0, 2, 0)
+  let targetQuaternion = new THREE.Quaternion(0, 0, 0, 1)
+  
+  switch (viewType) {
+    case 'main':
+      // 主视角
+      camera.position.set(-3, 5, -10) // 降低主视角相机高度
+      controls.target.set(0, 2, 0)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(-3, 5, -10) // 降低主视角相机高度
+      cameraTargetLookAt.set(0, 2, 0)
+      controlsTarget.set(0, 2, 0)
+      break
+    case 'axle1-position1':
+      // 转向架1的前轴的左轮（一轴左轮）
+      if (wheelSet) {
+        targetPosition.copy(wheelSet.position)
+        targetQuaternion.copy(wheelSet.quaternion)
+      } else {
+        // 轮对未初始化时使用默认位置
+        targetPosition.set(0, 1, 0)
+        targetQuaternion.set(0, 0, 0, 1)
+      }
+      camera.position.set(targetPosition.x - 1.5, 3, targetPosition.z - 2) // 调整相机位置，远离车轮，更好地展示轮轨接触
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x - 1.5, 3, targetPosition.z - 2) // 调整相机位置，远离车轮，更好地展示轮轨接触
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle1-position2':
+      // 转向架1的前轴的右轮（一轴右轮）
+      if (wheelSet) {
+        targetPosition.copy(wheelSet.position)
+        targetQuaternion.copy(wheelSet.quaternion)
+      } else {
+        // 轮对未初始化时使用默认位置
+        targetPosition.set(0, 1, 0)
+        targetQuaternion.set(0, 0, 0, 1)
+      }
+      camera.position.set(targetPosition.x + 1.5, 3, targetPosition.z - 2) // 调整相机位置，远离车轮，更好地展示轮轨接触
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x + 1.5, 3, targetPosition.z - 2) // 调整相机位置，远离车轮，更好地展示轮轨接触
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle2-position1':
+      // 转向架1的后轴的左轮（二轴左轮）
+      if (secondWheelSet) {
+        targetPosition.copy(secondWheelSet.position)
+        targetQuaternion.copy(secondWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle2-position2':
+      // 转向架1的后轴的右轮（二轴右轮）
+      if (secondWheelSet) {
+        targetPosition.copy(secondWheelSet.position)
+        targetQuaternion.copy(secondWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle3-position1':
+      // 转向架2的前轴的左轮（三轴左轮）
+      if (thirdWheelSet) {
+        targetPosition.copy(thirdWheelSet.position)
+        targetQuaternion.copy(thirdWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle3-position2':
+      // 转向架2的前轴的右轮（三轴右轮）
+      if (thirdWheelSet) {
+        targetPosition.copy(thirdWheelSet.position)
+        targetQuaternion.copy(thirdWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle4-position1':
+      // 转向架2的后轴的左轮（四轴左轮）
+      if (fourthWheelSet) {
+        targetPosition.copy(fourthWheelSet.position)
+        targetQuaternion.copy(fourthWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x - 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+    case 'axle4-position2':
+      // 转向架2的后轴的右轮（四轴右轮）
+      if (fourthWheelSet) {
+        targetPosition.copy(fourthWheelSet.position)
+        targetQuaternion.copy(fourthWheelSet.quaternion)
+      }
+      camera.position.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      controls.target.set(targetPosition.x, 0.5, targetPosition.z)
+      
+      // 更新相机目标变量
+      cameraTargetPosition.set(targetPosition.x + 1, 3, targetPosition.z - 1) // 提高相机高度
+      cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+      controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+      break
+  }
+  
+  // 更新控制器
+  controls.update()
+  
+  // 更新相机朝向
+  camera.lookAt(controls.target)
+}
 
 // 图表实例
 let wheelLoadReductionChart = null
@@ -163,10 +339,10 @@ function initScene() {
     0.1,
     10000
   )
-  camera.position.set(-3, 8, -10) // 与动态相机位置一致
+  camera.position.set(-3, 5, -10) // 降低主视角相机高度
   
   // 初始化相机目标位置
-  cameraTargetPosition.set(-3, 8, -10)
+  cameraTargetPosition.set(-3, 5, -10)
   cameraTargetLookAt.set(0, 2, 0)
   controlsTarget.set(0, 2, 0)
   camera.lookAt(0, 0, 0)
@@ -348,14 +524,14 @@ function createRail(trackPath, color = 0x333333) {
   const rail = new THREE.Mesh(geometry, material)
   rail.castShadow = true
   rail.receiveShadow = true
-  // 调整钢轨位置，使其位于轨枕上方
-  rail.position.y = 0.1 + 0.2 + 0.2 + 0.23 // 钢轨位于指定高度
+  // 调整钢轨位置，使其位于轨枕上方且不与车轮重叠
+  rail.position.y = 0.1 + 0.2 + 0.2 + 0.2 // 钢轨位于指定高度，略低于车轮底部
   return rail
 }
 
 // 创建轨道偏移路径
 function offsetTrackPath(basePath, offsetDistance) {
-  const offsetPath = new THREE.CurvePath()
+  const points = []
   const segments = 200
   
   for (let i = 0; i <= segments; i++) {
@@ -376,15 +552,13 @@ function offsetTrackPath(basePath, offsetDistance) {
     
     // 应用偏移
     const offsetPoint = point.clone().add(normal.multiplyScalar(offsetDistance))
-    
-    if (i > 0) {
-      const prevPoint = offsetPath.curves[offsetPath.curves.length - 1].v2
-      offsetPath.add(new THREE.LineCurve3(prevPoint, offsetPoint))
-    } else {
-      // 第一个点，创建一个临时线段
-      offsetPath.add(new THREE.LineCurve3(offsetPoint, offsetPoint))
-    }
+    points.push(offsetPoint)
   }
+  
+  // 使用 CatmullRomCurve3 创建平滑曲线，确保法线方向一致
+  const offsetPath = new THREE.CatmullRomCurve3(points)
+  offsetPath.type = 'catmullrom'
+  offsetPath.tension = 0.5
   
   return offsetPath
 }
@@ -427,7 +601,7 @@ function createBallastlessTrack() {
   
   // 无砟轨道底座材质
   const baseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8b8b8b, // 灰色混凝土
+    color: 0x2e3034, // 轨道基座颜色
     metalness: 0.1,
     roughness: 0.7
   })
@@ -609,6 +783,9 @@ function createWheelSet() {
   
   // 更新轮对位置
   updateWheelSetPosition(progress.value)
+  
+  // 创建轮轨接触点箭头
+  createContactArrows()
   
   // 加载转向架模型
   loadBogie()
@@ -968,6 +1145,9 @@ function updateWheelSetPosition(progressValue) {
   
   // 更新轨道元素
   updateTrackElements()
+  
+  // 更新轮轨接触点箭头位置
+  updateContactArrows()
 }
 
 // 更新轨道元素（动态生成和销毁）
@@ -990,7 +1170,7 @@ function updateTrackElements() {
   
   // 轨枕材质
   const sleeperMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd9d9d9, // 浅灰色
+    color: 0xfffdff, // 浅灰色
     metalness: 0.1,
     roughness: 0.8
   })
@@ -1001,7 +1181,7 @@ function updateTrackElements() {
   }
   if (!sharedMaterials.base) {
     sharedMaterials.base = new THREE.MeshStandardMaterial({
-      color: 0x8b8b8b, // 灰色混凝土
+      color: 0x2e3034, // 轨道基座颜色
       metalness: 0.1,
       roughness: 0.7
     })
@@ -1019,7 +1199,7 @@ function updateTrackElements() {
   }
   if (!sharedMaterials.sleeper) {
     sharedMaterials.sleeper = new THREE.MeshStandardMaterial({
-      color: 0xd9d9d9, // 浅灰色
+      color: 0xfffdff, // 浅灰色
       metalness: 0.1,
       roughness: 0.8
     })
@@ -1369,21 +1549,19 @@ function createRailSegment(trackPath, startProgress, endProgress, color = 0x3333
   const rotatedProfile = profile.map(point => new THREE.Vector2(-point.y, point.x))
   
   // 创建钢轨段路径
-  const segmentPath = new THREE.CurvePath()
+  const segmentPoints = []
   const segmentSteps = 50
   
   for (let i = 0; i <= segmentSteps; i++) {
     const progress = startProgress + (endProgress - startProgress) * (i / segmentSteps)
     const point = trackPath.getPoint(progress)
-    
-    if (i > 0) {
-      const prevPoint = segmentPath.curves[segmentPath.curves.length - 1].v2
-      segmentPath.add(new THREE.LineCurve3(prevPoint, point))
-    } else {
-      // 第一个点，创建一个临时线段
-      segmentPath.add(new THREE.LineCurve3(point, point))
-    }
+    segmentPoints.push(point)
   }
+  
+  // 使用 CatmullRomCurve3 创建平滑曲线，确保法线方向一致
+  const segmentPath = new THREE.CatmullRomCurve3(segmentPoints)
+  segmentPath.type = 'catmullrom'
+  segmentPath.tension = 0.5
   
   const extrudeSettings = {
     steps: segmentSteps,
@@ -1401,8 +1579,8 @@ function createRailSegment(trackPath, startProgress, endProgress, color = 0x3333
   const railSegment = new THREE.Mesh(geometry, material)
   railSegment.castShadow = true
   railSegment.receiveShadow = true
-  // 调整钢轨位置，使其位于轨枕上方
-  railSegment.position.y = 0.1 + 0.2 + 0.2 + 0.23 // 钢轨位于指定高度
+  // 调整钢轨位置，使其位于轨枕上方且不与车轮重叠
+  railSegment.position.y = 0.1 + 0.2 + 0.2 + 0.2 // 钢轨位于指定高度，略低于车轮底部
   
   return railSegment
 }
@@ -1435,7 +1613,7 @@ function updateGroundAndGrids() {
   // 初始化共享地面材质
   if (!sharedMaterials.ground) {
     sharedMaterials.ground = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xc0c5c9,
       roughness: 0.9,
       metalness: 0.1
     })
@@ -1571,46 +1749,122 @@ function animate() {
       progress.value = 0
     }
     updateWheelSetPosition(progress.value)
-    
-    // 更新实时运行视窗的列车位置
-    if (realtimeSceneInfo) {
-      const realtimeProgress = progress.value
-      updateTrainPosition(realtimeProgress)
-    }
   }
   
   // 相机平滑跟随
   if (cameraFollow.value) {
     const smoothFactor = 0.08 // 平滑过渡因子，值越小过渡越平滑
     
-    // 平滑更新相机位置
-    camera.position.lerp(cameraTargetPosition, smoothFactor)
-    
-    // 平滑更新相机朝向
-    const lookAtDirection = cameraTargetLookAt.clone().sub(camera.position).normalize()
-    const currentDirection = new THREE.Vector3().subVectors(controls.target, camera.position).normalize()
-    const smoothedDirection = currentDirection.lerp(lookAtDirection, smoothFactor)
-    const newLookAt = camera.position.clone().add(smoothedDirection.multiplyScalar(10))
-    
-    // 平滑更新轨道控制器目标点
-    controls.target.lerp(controlsTarget, smoothFactor)
-    
-    // 更新相机朝向
-    camera.lookAt(newLookAt)
+    // 根据当前视角类型更新相机目标
+    if (currentView.value === 'main') {
+      // 主视角：使用原有的相机目标更新逻辑
+      camera.position.lerp(cameraTargetPosition, smoothFactor)
+      
+      // 平滑更新相机朝向
+      const lookAtDirection = cameraTargetLookAt.clone().sub(camera.position).normalize()
+      const currentDirection = new THREE.Vector3().subVectors(controls.target, camera.position).normalize()
+      const smoothedDirection = currentDirection.lerp(lookAtDirection, smoothFactor)
+      const newLookAt = camera.position.clone().add(smoothedDirection.multiplyScalar(10))
+      
+      // 平滑更新轨道控制器目标点
+      controls.target.lerp(controlsTarget, smoothFactor)
+      
+      // 更新相机朝向
+      camera.lookAt(newLookAt)
+    } else {
+      // 车轮视角：根据当前选择的车轮更新相机位置
+      let targetWheelSet = null
+      let offsetX = 0
+      
+      switch (currentView.value) {
+        case 'axle1-position1': // 一轴左轮
+          targetWheelSet = wheelSet
+          offsetX = -1
+          break
+        case 'axle1-position2': // 一轴右轮
+          targetWheelSet = wheelSet
+          offsetX = 1
+          break
+        case 'axle2-position1': // 二轴左轮
+          targetWheelSet = secondWheelSet
+          offsetX = -1
+          break
+        case 'axle2-position2': // 二轴右轮
+          targetWheelSet = secondWheelSet
+          offsetX = 1
+          break
+        case 'axle3-position1': // 三轴左轮
+          targetWheelSet = thirdWheelSet
+          offsetX = -1
+          break
+        case 'axle3-position2': // 三轴右轮
+          targetWheelSet = thirdWheelSet
+          offsetX = 1
+          break
+        case 'axle4-position1': // 四轴左轮
+          targetWheelSet = fourthWheelSet
+          offsetX = -1
+          break
+        case 'axle4-position2': // 四轴右轮
+          targetWheelSet = fourthWheelSet
+          offsetX = 1
+          break
+      }
+      
+      if (targetWheelSet) {
+        // 计算目标相机位置
+        let offsetX = 0
+        let offsetZ = -2
+        
+        // 根据当前视角类型调整偏移量
+        if (currentView.value === 'axle1-position1') {
+          offsetX = -1.5
+        } else if (currentView.value === 'axle1-position2') {
+          offsetX = 1.5
+        } else if (currentView.value === 'axle2-position1') {
+          offsetX = -1
+        } else if (currentView.value === 'axle2-position2') {
+          offsetX = 1
+        } else if (currentView.value === 'axle3-position1') {
+          offsetX = -1
+        } else if (currentView.value === 'axle3-position2') {
+          offsetX = 1
+        } else if (currentView.value === 'axle4-position1') {
+          offsetX = -1
+        } else if (currentView.value === 'axle4-position2') {
+          offsetX = 1
+        }
+        
+        const targetCamPos = new THREE.Vector3(
+          targetWheelSet.position.x + offsetX,
+          3,  // 使用与switchView一致的相机高度
+          targetWheelSet.position.z + offsetZ
+        )
+        
+        // 计算目标朝向点
+        const targetLookAt = new THREE.Vector3(
+          targetWheelSet.position.x,
+          0.5,
+          targetWheelSet.position.z
+        )
+        
+        // 平滑更新相机位置
+        camera.position.lerp(targetCamPos, smoothFactor)
+        
+        // 平滑更新相机朝向
+        controls.target.lerp(targetLookAt, smoothFactor)
+        
+        // 更新相机朝向
+        camera.lookAt(targetLookAt)
+      }
+    }
   }
   
   controls.update()
   renderer.render(scene, camera)
   
-  // 渲染实时运行视窗
-  if (realtimeSceneInfo) {
-    // 获取列车并让相机跟随
-    const trains = getTrains()
-    if (trains && trains.length > 0) {
-      followTrain(trains)
-    }
-    renderScene()
-  }
+  // 更新轮轨接触点箭头位置
+  updateContactArrows()
   
   // 更新小地图
   updateMinimap(camera, [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet].filter(Boolean))
@@ -1771,6 +2025,117 @@ function updateCameraTargetPosition() {
   }
 }
 
+// 创建箭头（圆柱体+圆锥体）
+function createArrow() {
+  const arrowGroup = new THREE.Group()
+  
+  // 创建圆柱体（箭头杆）- 放大比例
+  const cylinderGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.2, 8)
+  const arrowMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 })
+  const cylinder = new THREE.Mesh(cylinderGeometry, arrowMaterial)
+  cylinder.position.y = 0.1
+  arrowGroup.add(cylinder)
+  
+  // 创建圆锥体（箭头头）- 放大比例
+  const coneGeometry = new THREE.ConeGeometry(0.04, 0.08, 8)
+  const cone = new THREE.Mesh(coneGeometry, arrowMaterial)
+  cone.position.y = 0.24
+  arrowGroup.add(cone)
+  
+  return arrowGroup
+}
+
+// 创建轮轨接触点箭头
+function createContactArrows() {
+  // 清除旧的箭头
+  contactArrows.forEach(arrow => {
+    scene.remove(arrow)
+  })
+  contactArrows = []
+  
+  // 为每个车轮创建箭头
+  const wheelSets = [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet]
+  const wheelArrays = [wheels, secondWheels, thirdWheels, fourthWheels]
+  
+  wheelSets.forEach((ws, wsIndex) => {
+    if (!ws) return
+    
+    const wsWheels = wheelArrays[wsIndex]
+    if (!wsWheels) return
+    
+    wsWheels.forEach((wheel, wheelIndex) => {
+      // 创建三个方向的箭头（x, y, z）
+      for (let i = 0; i < 3; i++) {
+        const arrow = createArrow()
+        
+        // 设置箭头方向
+        switch (i) {
+          case 0: // x轴方向
+            arrow.rotation.z = Math.PI / 2
+            break
+          case 1: // y轴方向（默认）
+            break
+          case 2: // z轴方向
+            arrow.rotation.x = Math.PI / 2
+            break
+        }
+        
+        scene.add(arrow)
+        contactArrows.push(arrow)
+      }
+    })
+  })
+}
+
+// 更新轮轨接触点箭头位置
+function updateContactArrows() {
+  if (contactArrows.length === 0) return
+  
+  // 轮对和车轮数组
+  const wheelSets = [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet]
+  const wheelArrays = [wheels, secondWheels, thirdWheels, fourthWheels]
+  
+  let arrowIndex = 0
+  
+  wheelSets.forEach((ws, wsIndex) => {
+    if (!ws) return
+    
+    const wsWheels = wheelArrays[wsIndex]
+    if (!wsWheels) return
+    
+    wsWheels.forEach((wheel, wheelIndex) => {
+      // 计算车轮与钢轨接触点位置
+      const wheelPosition = new THREE.Vector3()
+      wheel.getWorldPosition(wheelPosition)
+      
+      // 车轮半径
+      const wheelRadius = wheelSetParams.wheelRadius
+      
+      // 接触点位置（车轮底部，与轨道顶面齐平）
+      const contactPoint = new THREE.Vector3(
+        wheelPosition.x,
+        wheelPosition.y - wheelRadius, // 车轮中心高度减去车轮半径，即为轨道顶面高度
+        wheelPosition.z
+      )
+      
+      // 更新三个方向的箭头
+      for (let i = 0; i < 3; i++) {
+        if (arrowIndex < contactArrows.length) {
+          const arrow = contactArrows[arrowIndex]
+          // 箭头位置：接触点位置向后移动一定距离（Z轴负方向）
+          const arrowPosition = new THREE.Vector3(
+            contactPoint.x,
+            contactPoint.y,
+            contactPoint.z - 0.5 // 向后移动0.5单位距离
+          )
+          arrow.position.copy(arrowPosition)
+          arrowIndex++
+        }
+      }
+    })
+  })
+}
+
 // 进度条变化处理
 function onProgressChange() {
   updateWheelSetPosition(progress.value)
@@ -1796,23 +2161,6 @@ function onWindowResize() {
 onMounted(() => {
   initScene()
   window.addEventListener('resize', onWindowResize)
-  
-  // 初始化实时运行视窗
-  if (realtimeViewContainer.value) {
-    realtimeSceneInfo = initThreeScene(realtimeViewContainer.value)
-    
-    // 创建轨道
-    const { trackPath: newTrackPath, trackLength: newTrackLength } = createManagerTrack(realtimeSceneInfo.scene)
-    trackPath = newTrackPath
-    trackLength = newTrackLength
-    
-    // 设置轨道信息
-    setTrackInfo(trackPath, trackLength)
-    setTrackPath(trackPath)
-    
-    // 创建列车
-    createTrain(realtimeSceneInfo.scene, trackPath, trackLength)
-  }
   
   // 初始化图表
   initWheelLoadReductionChart()
@@ -1897,11 +2245,6 @@ onUnmounted(() => {
   webSocketAPI.disconnect(wheelRailForceWS)
 })
 
-// 导航到列车实时运行页面
-function navigateToMarshallingVisualization() {
-  router.push('/marshalling-visualization')
-}
-
 // 初始化轮重减载率曲线
 const initWheelLoadReductionChart = () => {
   if (!wheelLoadReductionChartRef.value) return
@@ -1923,6 +2266,10 @@ const initWheelLoadReductionChart = () => {
       textStyle: {
         fontSize: 10,
         color: '#fff'
+      },
+      selected: {
+        '左侧轮重减载率': true,
+        '右侧轮重减载率': false
       }
     },
     grid: {
@@ -2109,6 +2456,10 @@ const initDerailmentCoefficientChart = () => {
       textStyle: {
         fontSize: 10,
         color: '#fff'
+      },
+      selected: {
+        '左侧脱轨系数': true,
+        '右侧脱轨系数': false
       }
     },
     grid: {
@@ -2297,6 +2648,11 @@ const initWheelRailForceChart = () => {
       textStyle: {
         fontSize: 10,
         color: '#fff'
+      },
+      selected: {
+        '轮轨垂向力': true,
+        '轮轨横向力': false,
+        '轮轨纵向力': false
       }
     },
     grid: {
@@ -2488,17 +2844,35 @@ const handleWheelRailForceMessage = (message) => {
 
 .canvas-container {
   flex: 1;
-  background: linear-gradient(135deg, #8aceff 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #89ceff 0%, #ffffff 100%);
   overflow: hidden;
 }
 
 /* 图表窗口样式 */
 .chart-windows {
   position: absolute;
-  top: 70px;
-  left: 340px;
+  top: 80px;
+  left: 270px;
   right: 20px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  margin-bottom: 5px;
+}
+
+.chart-controls .speed-button {
+  flex: 1;
+  max-width: 120px;
+}
+
+.chart-window-container {
   display: flex;
   gap: 20px;
   justify-content: flex-start;
@@ -2506,24 +2880,62 @@ const handleWheelRailForceMessage = (message) => {
 }
 
 .chart-window {
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 28, 78, 0.7);
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
   width: 280px;
-  height: 180px;
+  height: 190px;
+}
+
+.chart-window-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .chart-window h4 {
   color: #fff;
-  margin: 0 0 10px 0;
+  margin: 0;
   font-size: 14px;
   text-align: center;
+  flex: 1;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .chart {
   width: 100%;
-  height: calc(100% - 24px);
+  height: calc(100% - 22px);
+}
+
+.section-title {
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  margin-right: 20px;
+  white-space: nowrap;
 }
 
 .controls-container {
@@ -2533,6 +2945,53 @@ const handleWheelRailForceMessage = (message) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.buttons-and-selector {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.buttons-and-selector .el-button {
+  background-color: #008afa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.buttons-and-selector .el-button:hover {
+  background-color: #0077d9;
+}
+
+.view-selector {
+  margin-left: 0;
+}
+
+.view-select-dropdown {
+  background-color: #008afa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.3s ease;
+}
+
+.view-select-dropdown:hover {
+  background-color: #0077d9;
+}
+
+.view-select-dropdown option {
+  background-color: #fff;
+  color: #333;
 }
 
 .chart-buttons {
@@ -2545,7 +3004,7 @@ const handleWheelRailForceMessage = (message) => {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
-  background-color: #0075ff !important;
+  background-color: #ff6b00 !important;
   color: white;
   cursor: pointer;
   font-size: 0.9rem;
@@ -2554,12 +3013,12 @@ const handleWheelRailForceMessage = (message) => {
 }
 
 .speed-button:hover {
-  background-color: #0066e6 !important;
+  background-color: #ff8500 !important;
 }
 
 .speed-button.active {
-  background-color: #0050b3 !important;
-  box-shadow: 0 2px 4px rgba(0, 80, 179, 0.3);
+  background-color: #ff4500 !important;
+  box-shadow: 0 2px 4px rgba(255, 69, 0, 0.3);
   font-weight: 600;
 }
 
@@ -2576,14 +3035,6 @@ const handleWheelRailForceMessage = (message) => {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   z-index: 100;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.realtime-view-fixed:hover {
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .realtime-view-fixed h4 {
@@ -2601,12 +3052,14 @@ const handleWheelRailForceMessage = (message) => {
   overflow: hidden;
 }
 
+/* 固定位置的小地图 */
+
 .minimap-fixed {
   position: absolute;
   top: 80px;
   left: 20px;
-  width: 300px;
-  height: 344px;
+  width: 230px;
+  height: 254px;
   background-color: rgba(10, 25, 47, 0.8);
   border-radius: 8px;
   padding: 15px;
@@ -2625,9 +3078,10 @@ const handleWheelRailForceMessage = (message) => {
 
 .minimap-fixed canvas {
   width: 100%;
-  height: 300px;
+  height: 200px;
   border-radius: 4px;
   background-color: #b2d1fd;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
 </style>

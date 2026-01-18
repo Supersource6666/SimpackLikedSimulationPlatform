@@ -6,7 +6,6 @@
       <div class="nav-links">
         <router-link to="/" class="nav-link">动力学参数</router-link>
         <router-link to="/wheel-rail-contact" class="nav-link">轮轨接触分析</router-link>
-        <router-link to="/marshalling-visualization" class="nav-link">列车实时运行</router-link>
       </div>
     </nav>
     
