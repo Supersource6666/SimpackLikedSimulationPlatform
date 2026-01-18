@@ -20,6 +20,13 @@
         <router-view></router-view>
       </main>
     </div>
+    
+    <!-- 页脚备案信息 -->
+    <footer class="app-footer">
+      <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="beian-link">
+        蜀ICP备2025168305号
+      </a>
+    </footer>
   </div>
 </template>
 
@@ -81,5 +88,27 @@ import Sidebar from './components/Sidebar.vue'
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+.app-footer {
+  height: 40px;
+  background-color: #333;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+}
+
+.beian-link {
+  color: white;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.beian-link:hover {
+  color: #aaa;
+  text-decoration: underline;
 }
 </style>
