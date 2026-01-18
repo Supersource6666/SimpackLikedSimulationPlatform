@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import TrackView from './components/TrackView.vue'
 import Parameter from './components/Parameter.vue'
 import MarshallingVisualization from './components/MarshallingVisualization.vue'
 import WheelRailContact from './components/WheelRailContact.vue'
@@ -9,11 +8,6 @@ const routes = [
     path: '/',
     name: 'Parameter',
     component: Parameter
-  },
-  {
-    path: '/track',
-    name: 'TrackView',
-    component: TrackView
   },
   {
     path: '/marshalling-visualization',

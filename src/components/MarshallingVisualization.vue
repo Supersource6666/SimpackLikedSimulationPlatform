@@ -1,25 +1,44 @@
 <template>
   <div class="train-marshalling-container">
     <div class="viewer-container">
-      <div ref="canvasContainer" class="canvas-container"></div>
       <div class="controls-container">
         <el-button @click="toggleAnimation">{{ isAnimating ? '停止运行' : '开始运行' }}</el-button>
         <el-button @click="resetPosition">重置位置</el-button>
+
+        <div class="chart-buttons">
+          <button class="speed-button" :class="{ 'active': showSpeedChart }" @click="toggleSpeedChart">速度</button>
+          <button class="speed-button" :class="{ 'active': showAxleBoxAccelerationChart }" @click="toggleAxleBoxAccelerationChart">轴箱加速度</button>
+          <button class="speed-button" :class="{ 'active': showFrameAccelerationChart }" @click="toggleFrameAccelerationChart">构架加速度</button>
+        </div>
+
       </div>
-    </div>
-    <div class="side-panel">
-      <div class="marshalling-controls">
-        <div class="acceleration-dropdowns">
-          <button class="speed-button" @click="toggleSpeedChart">速度</button>
-          <select class="acceleration-select" @change="handleAccelerationChange">
-            <option value="">请选择加速度类型</option>
-            <option value="axle-box">轴箱加速度</option>
-            <option value="frame">构架加速度</option>
-          </select>
+      <div ref="canvasContainer" class="canvas-container"></div>
+      
+      <!-- 固定位置的曲线图窗 -->
+      <div class="chart-windows">
+        <div v-if="showSpeedChart" class="chart-window">
+          <h4>速度</h4>
+          <div ref="speedChartRef" class="chart"></div>
+        </div>
+        <div v-if="showAxleBoxAccelerationChart" class="chart-window">
+          <h4>轴箱加速度</h4>
+          <div ref="axleBoxAccelerationChartRef" class="chart"></div>
+        </div>
+        <div v-if="showFrameAccelerationChart" class="chart-window">
+          <h4>构架加速度</h4>
+          <div ref="frameAccelerationChartRef" class="chart"></div>
         </div>
       </div>
-      <div class="info-panel">
-        <h3>运行状态</h3>
+      
+      <!-- 固定位置的小地图 -->
+      <div class="minimap-fixed">
+        <h4>列车轨迹小地图</h4>
+        <canvas id="minimapCanvas" width="300" height="300"></canvas>
+      </div>
+      
+      <!-- 固定位置的运行状态 -->
+      <div class="status-fixed">
+        <h4>运行状态</h4>
         <div class="info-item">
           <span class="label">当前位置：</span>
           <span class="value">{{ currentPositionText }}</span>
@@ -37,30 +56,6 @@
           <span class="value">{{ trainSpeed.toFixed(1) }}x</span>
         </div>
       </div>
-      <!-- 添加二维小地图 -->
-      <div class="minimap-container">
-        <h3>列车轨迹小地图</h3>
-        <canvas id="minimapCanvas" width="300" height="300"></canvas>
-      </div>
-      
-      <!-- 速度-里程标曲线图表容器 -->
-      <div v-if="showSpeedChart" class="speed-chart-container">
-        <h3 class="chart-title">速度-里程标曲线</h3>
-        <div 
-          ref="speedChartRef" 
-          class="chart"
-        ></div>
-      </div>
-      
-      <!-- 加速度-里程标曲线图表容器 -->
-      <div v-if="showAccelerationChart" class="acceleration-chart-container">
-        <h3 class="chart-title">{{ selectedAcceleration === 'axle-box' ? '轴箱加速度' : '构架加速度' }}-里程标曲线</h3>
-        <div 
-          ref="accelerationChartRef" 
-          class="chart"
-        ></div>
-      </div>
-      
     </div>
   </div>
 </template>
@@ -82,19 +77,36 @@ const canvasContainer = ref(null)
 const router = useRouter()
 
 // 速度图表相关
-const showSpeedChart = ref(false)
+const showSpeedChart = ref(true)
 const speedChartRef = ref(null)
 let speedChart = null
 let speedWs = null
 let speedData = { mileages: [], values: [] }
 
-// 加速度图表相关
-const showAccelerationChart = ref(false)
-const accelerationChartRef = ref(null)
-const selectedAcceleration = ref('')
-let accelerationChart = null
-let accelerationWs = null
-let accelerationData = { mileages: [], values: [] }
+// 轴箱加速度图表相关
+const showAxleBoxAccelerationChart = ref(true)
+const axleBoxAccelerationChartRef = ref(null)
+let axleBoxAccelerationChart = null
+let axleBoxAccelerationWs = null
+let axleBoxAccelerationData = { 
+  mileages: [], 
+  values1_1: [],
+  values1_2: [],
+  values1_3: [],
+  values2_1: [],
+  values2_2: []
+}
+
+// 构架加速度图表相关
+const showFrameAccelerationChart = ref(true)
+const frameAccelerationChartRef = ref(null)
+let frameAccelerationChart = null
+let frameAccelerationWs = null
+let frameAccelerationData = { 
+  mileages: [], 
+  values1: [],
+  values2: []
+}
 
 // 状态变量
 const isAnimating = ref(false)
@@ -127,6 +139,7 @@ const generateMockData = (points = 100, maxValue = 100, minValue = 0) => {
   return data;
 };
 
+
 // 初始化速度-里程标曲线
 const initSpeedChart = () => {
   if (!speedChartRef.value) return;
@@ -145,6 +158,7 @@ const initSpeedChart = () => {
       left: '3%',
       right: '4%',
       bottom: '3%',
+      top: '20%',
       containLabel: true
     },
     xAxis: {
@@ -152,28 +166,42 @@ const initSpeedChart = () => {
       boundaryGap: false,
       data: [],
       name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
       axisLine: {
         lineStyle: {
-          color: '#333'
+          color: '#aaa'
         }
       },
       axisLabel: {
-        formatter: '{value}km'
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
       }
     },
     yAxis: {
       type: 'value',
       name: '速度 (km/h)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
       axisLine: {
         lineStyle: {
-          color: '#333'
+          color: '#aaa'
         }
       },
       splitLine: {
         lineStyle: {
           type: 'dashed',
-          color: '#eee'
+          color: 'rgba(255,255,255,0.1)'
         }
+      },
+      axisLabel: {
+        color: '#fff',
+        fontSize: 9
       }
     },
     series: [
@@ -184,7 +212,7 @@ const initSpeedChart = () => {
         data: [],
         lineStyle: {
           color: '#409EFF',
-          width: 2
+          width: 1.5
         },
         itemStyle: {
           color: '#409EFF'
@@ -200,6 +228,7 @@ const initSpeedChart = () => {
   };
   
   speedChart.setOption(option);
+
   
   // 建立WebSocket连接
   speedWs = webSocketAPI.connectSpeed(
@@ -280,25 +309,44 @@ const destroySpeedChart = () => {
   speedData = { mileages: [], values: [] };
 };
 
-// 初始化加速度-里程标曲线
-const initAccelerationChart = () => {
-  if (!accelerationChartRef.value || !selectedAcceleration.value) return;
+// 初始化轴箱加速度-里程标曲线
+const initAxleBoxAccelerationChart = () => {
+  if (!axleBoxAccelerationChartRef.value) return;
   
-  accelerationChart = echarts.init(accelerationChartRef.value);
+  axleBoxAccelerationChart = echarts.init(axleBoxAccelerationChartRef.value);
   
   // 初始化图表配置
   const option = {
     tooltip: {
       trigger: 'axis',
       formatter: function(params) {
-        const accelerationType = selectedAcceleration.value === 'axle-box' ? '轴箱加速度' : '构架加速度';
-        return `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>${accelerationType}: ${params[0].data.toFixed(2)} m/s²`;
+        let result = `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>`;
+        params.forEach(param => {
+          result += `${param.seriesName}: ${param.data.toFixed(2)} m/s²<br/>`;
+        });
+        return result;
+      }
+    },
+    legend: {
+      data: ['1-1', '1-2', '1-3', '2-1', '2-2'],
+      top: 10,
+      textStyle: {
+        fontSize: 10,
+        color: '#fff'
+      },
+      selected: {
+        '1-1': true,
+        '1-2': false,
+        '1-3': false,
+        '2-1': false,
+        '2-2': false
       }
     },
     grid: {
       left: '3%',
       right: '4%',
       bottom: '3%',
+      top: '20%',
       containLabel: true
     },
     xAxis: {
@@ -306,157 +354,488 @@ const initAccelerationChart = () => {
       boundaryGap: false,
       data: [],
       name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
       axisLine: {
         lineStyle: {
-          color: '#333'
+          color: '#aaa'
         }
       },
       axisLabel: {
-        formatter: '{value}km'
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
       }
     },
     yAxis: {
       type: 'value',
-      name: selectedAcceleration.value === 'axle-box' ? '轴箱加速度 (m/s²)' : '构架加速度 (m/s²)',
+      name: '轴箱加速度 (m/s²)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
       axisLine: {
         lineStyle: {
-          color: '#333'
+          color: '#aaa'
         }
       },
       splitLine: {
         lineStyle: {
           type: 'dashed',
-          color: '#eee'
+          color: 'rgba(255,255,255,0.1)'
         }
+      },
+      axisLabel: {
+        color: '#fff',
+        fontSize: 9
       }
     },
     series: [
       {
-        name: selectedAcceleration.value === 'axle-box' ? '轴箱加速度' : '构架加速度',
+        name: '1-1',
         type: 'line',
         stack: 'Total',
         data: [],
         lineStyle: {
-          color: selectedAcceleration.value === 'axle-box' ? '#E6A23C' : '#67C23A',
-          width: 2
+          color: '#E6A23C',
+          width: 1.5
         },
         itemStyle: {
-          color: selectedAcceleration.value === 'axle-box' ? '#E6A23C' : '#67C23A'
+          color: '#E6A23C'
+        }
+      },
+      {
+        name: '1-2',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#409EFF',
+          width: 1.5
         },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: selectedAcceleration.value === 'axle-box' ? 'rgba(230, 162, 60, 0.5)' : 'rgba(103, 194, 58, 0.5)' },
-            { offset: 1, color: selectedAcceleration.value === 'axle-box' ? 'rgba(230, 162, 60, 0.1)' : 'rgba(103, 194, 58, 0.1)' }
-          ])
+        itemStyle: {
+          color: '#409EFF'
+        }
+      },
+      {
+        name: '1-3',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#67C23A',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#67C23A'
+        }
+      },
+      {
+        name: '2-1',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#F56C6C',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#F56C6C'
+        }
+      },
+      {
+        name: '2-2',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#909399',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#909399'
         }
       }
     ]
   };
   
-  accelerationChart.setOption(option);
+  axleBoxAccelerationChart.setOption(option);
   
   // 建立WebSocket连接
-  const connectFunction = selectedAcceleration.value === 'axle-box' ? webSocketAPI.connectAxialAcceleration : webSocketAPI.connectFrameAcceleration;
-  
-  accelerationWs = connectFunction(
+  axleBoxAccelerationWs = webSocketAPI.connectAxialAcceleration(
     (message) => {
       if (message.type === 'historical_data') {
         // 处理历史数据
-        accelerationData.mileages = message.data.map(item => item.mileage);
-        accelerationData.values = message.data.map(item => item.value);
-        accelerationChart.setOption({
+        axleBoxAccelerationData.mileages = message.data.map(item => item.mileage);
+        axleBoxAccelerationData.values1_1 = message.data.map(item => item.value1_1 || item.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values1_2 = message.data.map(item => item.value1_2 || item.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values1_3 = message.data.map(item => item.value1_3 || item.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values2_1 = message.data.map(item => item.value2_1 || item.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values2_2 = message.data.map(item => item.value2_2 || item.value || Math.random() * 6 - 3);
+        axleBoxAccelerationChart.setOption({
           xAxis: {
-            data: accelerationData.mileages
+            data: axleBoxAccelerationData.mileages
           },
           series: [
             {
-              data: accelerationData.values
+              data: axleBoxAccelerationData.values1_1
+            },
+            {
+              data: axleBoxAccelerationData.values1_2
+            },
+            {
+              data: axleBoxAccelerationData.values1_3
+            },
+            {
+              data: axleBoxAccelerationData.values2_1
+            },
+            {
+              data: axleBoxAccelerationData.values2_2
             }
           ]
         });
       } else if (message.type === 'realtime_data') {
         // 处理实时数据
-        accelerationData.mileages.push(message.data.mileage);
-        accelerationData.values.push(message.data.value);
+        axleBoxAccelerationData.mileages.push(message.data.mileage);
+        axleBoxAccelerationData.values1_1.push(message.data.value1_1 || message.data.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values1_2.push(message.data.value1_2 || message.data.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values1_3.push(message.data.value1_3 || message.data.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values2_1.push(message.data.value2_1 || message.data.value || Math.random() * 6 - 3);
+        axleBoxAccelerationData.values2_2.push(message.data.value2_2 || message.data.value || Math.random() * 6 - 3);
         
         // 保持数据点在1000km范围内
-        if (accelerationData.mileages.length > 0 && accelerationData.mileages[accelerationData.mileages.length - 1] - accelerationData.mileages[0] > 1000000) {
-          accelerationData.mileages.shift();
-          accelerationData.values.shift();
+        if (axleBoxAccelerationData.mileages.length > 0 && axleBoxAccelerationData.mileages[axleBoxAccelerationData.mileages.length - 1] - axleBoxAccelerationData.mileages[0] > 1000000) {
+          axleBoxAccelerationData.mileages.shift();
+          axleBoxAccelerationData.values1_1.shift();
+          axleBoxAccelerationData.values1_2.shift();
+          axleBoxAccelerationData.values1_3.shift();
+          axleBoxAccelerationData.values2_1.shift();
+          axleBoxAccelerationData.values2_2.shift();
         }
         
         // 更新图表
-        accelerationChart.setOption({
+        axleBoxAccelerationChart.setOption({
           xAxis: {
-            data: accelerationData.mileages
+            data: axleBoxAccelerationData.mileages
           },
           series: [
             {
-              data: accelerationData.values
+              data: axleBoxAccelerationData.values1_1
+            },
+            {
+              data: axleBoxAccelerationData.values1_2
+            },
+            {
+              data: axleBoxAccelerationData.values1_3
+            },
+            {
+              data: axleBoxAccelerationData.values2_1
+            },
+            {
+              data: axleBoxAccelerationData.values2_2
             }
           ]
         });
       }
     },
     (error) => {
-      console.error('加速度WebSocket错误:', error);
+      console.error('轴箱加速度WebSocket错误:', error);
       // 使用模拟数据
-      const mockData = generateMockData(100, selectedAcceleration.value === 'axle-box' ? 3 : 5, selectedAcceleration.value === 'axle-box' ? -3 : -5);
-      accelerationData.mileages = mockData.map(item => item.mileage);
-      accelerationData.values = mockData.map(item => item.value);
-      accelerationChart.setOption({
+      const mockData = generateMockData(100, 3, -3);
+      axleBoxAccelerationData.mileages = mockData.map(item => item.mileage);
+      axleBoxAccelerationData.values1_1 = mockData.map(item => item.value);
+      axleBoxAccelerationData.values1_2 = mockData.map(item => Math.random() * 6 - 3);
+      axleBoxAccelerationData.values1_3 = mockData.map(item => Math.random() * 6 - 3);
+      axleBoxAccelerationData.values2_1 = mockData.map(item => Math.random() * 6 - 3);
+      axleBoxAccelerationData.values2_2 = mockData.map(item => Math.random() * 6 - 3);
+      axleBoxAccelerationChart.setOption({
         xAxis: {
-          data: accelerationData.mileages
+          data: axleBoxAccelerationData.mileages
         },
         series: [
           {
-            data: accelerationData.values
+            data: axleBoxAccelerationData.values1_1
+          },
+          {
+            data: axleBoxAccelerationData.values1_2
+          },
+          {
+            data: axleBoxAccelerationData.values1_3
+          },
+          {
+            data: axleBoxAccelerationData.values2_1
+          },
+          {
+            data: axleBoxAccelerationData.values2_2
           }
         ]
       });
     },
     () => {
-      console.log('加速度WebSocket连接关闭');
+      console.log('轴箱加速度WebSocket连接关闭');
     }
   );
 };
 
-// 销毁加速度图表
-const destroyAccelerationChart = () => {
-  if (accelerationChart) {
-    accelerationChart.dispose();
-    accelerationChart = null;
+// 销毁轴箱加速度图表
+const destroyAxleBoxAccelerationChart = () => {
+  if (axleBoxAccelerationChart) {
+    axleBoxAccelerationChart.dispose();
+    axleBoxAccelerationChart = null;
   }
   
-  if (accelerationWs && accelerationWs.readyState === WebSocket.OPEN) {
-    accelerationWs.close();
-    accelerationWs = null;
+  if (axleBoxAccelerationWs && axleBoxAccelerationWs.readyState === WebSocket.OPEN) {
+    axleBoxAccelerationWs.close();
+    axleBoxAccelerationWs = null;
   }
   
-  accelerationData = { mileages: [], values: [] };
-  selectedAcceleration.value = '';
+  axleBoxAccelerationData = { 
+    mileages: [], 
+    values1_1: [],
+    values1_2: [],
+    values1_3: [],
+    values2_1: [],
+    values2_2: []
+  };
 };
 
-// 处理加速度类型选择
-const handleAccelerationChange = (event) => {
-  const value = event.target.value;
+// 初始化构架加速度-里程标曲线
+const initFrameAccelerationChart = () => {
+  if (!frameAccelerationChartRef.value) return;
   
-  if (value) {
-    // 选择了加速度类型，隐藏速度图表，显示加速度图表
-    showSpeedChart.value = false;
-    destroySpeedChart();
-    
-    selectedAcceleration.value = value;
-    showAccelerationChart.value = true;
-    
+  frameAccelerationChart = echarts.init(frameAccelerationChartRef.value);
+  
+  // 初始化图表配置
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        let result = `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>`;
+        params.forEach(param => {
+          result += `${param.seriesName}: ${param.data.toFixed(2)} m/s²<br/>`;
+        });
+        return result;
+      }
+    },
+    legend: {
+      data: ['1位端', '2位端'],
+      top: 10,
+      textStyle: {
+        fontSize: 10,
+        color: '#fff'
+      },
+      selected: {
+        '1位端': true,
+        '2位端': false
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '20%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: [],
+      name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '构架加速度 (m/s²)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      splitLine: {
+        lineStyle: {
+          type: 'dashed',
+          color: 'rgba(255,255,255,0.1)'
+        }
+      },
+      axisLabel: {
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    series: [
+      {
+        name: '1位端',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#E6A23C',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#E6A23C'
+        }
+      },
+      {
+        name: '2位端',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#409EFF',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#409EFF'
+        }
+      }
+    ]
+  };
+  
+  frameAccelerationChart.setOption(option);
+  
+  // 建立WebSocket连接
+  frameAccelerationWs = webSocketAPI.connectFrameAcceleration(
+    (message) => {
+      if (message.type === 'historical_data') {
+        // 处理历史数据
+        frameAccelerationData.mileages = message.data.map(item => item.mileage);
+        frameAccelerationData.values1 = message.data.map(item => item.value1 || item.value || Math.random() * 6 - 3);
+        frameAccelerationData.values2 = message.data.map(item => item.value2 || item.value || Math.random() * 6 - 3);
+        frameAccelerationChart.setOption({
+          xAxis: {
+            data: frameAccelerationData.mileages
+          },
+          series: [
+            {
+              data: frameAccelerationData.values1
+            },
+            {
+              data: frameAccelerationData.values2
+            }
+          ]
+        });
+      } else if (message.type === 'realtime_data') {
+        // 处理实时数据
+        frameAccelerationData.mileages.push(message.data.mileage);
+        frameAccelerationData.values1.push(message.data.value1 || message.data.value || Math.random() * 6 - 3);
+        frameAccelerationData.values2.push(message.data.value2 || message.data.value || Math.random() * 6 - 3);
+        
+        // 保持数据点在1000km范围内
+        if (frameAccelerationData.mileages.length > 0 && frameAccelerationData.mileages[frameAccelerationData.mileages.length - 1] - frameAccelerationData.mileages[0] > 1000000) {
+          frameAccelerationData.mileages.shift();
+          frameAccelerationData.values1.shift();
+          frameAccelerationData.values2.shift();
+        }
+        
+        // 更新图表
+        frameAccelerationChart.setOption({
+          xAxis: {
+            data: frameAccelerationData.mileages
+          },
+          series: [
+            {
+              data: frameAccelerationData.values1
+            },
+            {
+              data: frameAccelerationData.values2
+            }
+          ]
+        });
+      }
+    },
+    (error) => {
+      console.error('构架加速度WebSocket错误:', error);
+      // 使用模拟数据
+      const mockData = generateMockData(100, 3, -3);
+      frameAccelerationData.mileages = mockData.map(item => item.mileage);
+      frameAccelerationData.values1 = mockData.map(item => item.value);
+      frameAccelerationData.values2 = mockData.map(item => Math.random() * 6 - 3);
+      frameAccelerationChart.setOption({
+        xAxis: {
+          data: frameAccelerationData.mileages
+        },
+        series: [
+          {
+            data: frameAccelerationData.values1
+          },
+          {
+            data: frameAccelerationData.values2
+          }
+        ]
+      });
+    },
+    () => {
+      console.log('构架加速度WebSocket连接关闭');
+    }
+  );
+};
+
+// 销毁构架加速度图表
+const destroyFrameAccelerationChart = () => {
+  if (frameAccelerationChart) {
+    frameAccelerationChart.dispose();
+    frameAccelerationChart = null;
+  }
+  
+  if (frameAccelerationWs && frameAccelerationWs.readyState === WebSocket.OPEN) {
+    frameAccelerationWs.close();
+    frameAccelerationWs = null;
+  }
+  
+  frameAccelerationData = { 
+    mileages: [], 
+    values1: [],
+    values2: []
+  };
+};
+
+// 切换轴箱加速度图表显示/隐藏
+const toggleAxleBoxAccelerationChart = () => {
+  showAxleBoxAccelerationChart.value = !showAxleBoxAccelerationChart.value;
+  
+  if (showAxleBoxAccelerationChart.value) {
     // 延迟初始化图表，确保DOM已经渲染
     setTimeout(() => {
-      initAccelerationChart();
+      initAxleBoxAccelerationChart();
     }, 100);
   } else {
-    // 取消选择，隐藏加速度图表
-    showAccelerationChart.value = false;
-    destroyAccelerationChart();
+    // 隐藏轴箱加速度图表
+    destroyAxleBoxAccelerationChart();
+  }
+};
+
+// 切换构架加速度图表显示/隐藏
+const toggleFrameAccelerationChart = () => {
+  showFrameAccelerationChart.value = !showFrameAccelerationChart.value;
+  
+  if (showFrameAccelerationChart.value) {
+    // 延迟初始化图表，确保DOM已经渲染
+    setTimeout(() => {
+      initFrameAccelerationChart();
+    }, 100);
+  } else {
+    // 隐藏构架加速度图表
+    destroyFrameAccelerationChart();
   }
 };
 
@@ -465,10 +844,6 @@ const toggleSpeedChart = () => {
   showSpeedChart.value = !showSpeedChart.value;
   
   if (showSpeedChart.value) {
-    // 显示速度图表，隐藏加速度图表
-    showAccelerationChart.value = false;
-    destroyAccelerationChart();
-    
     // 延迟初始化图表，确保DOM已经渲染
     setTimeout(() => {
       initSpeedChart();
@@ -482,7 +857,8 @@ const toggleSpeedChart = () => {
 // 响应窗口大小变化
 const handleResize = () => {
   speedChart?.resize();
-  accelerationChart?.resize();
+  axleBoxAccelerationChart?.resize();
+  frameAccelerationChart?.resize();
 };
 
 // 跳转到动力学参数界面
@@ -536,6 +912,19 @@ onMounted(() => {
   } else {
     console.error('找不到小地图Canvas元素')
   }
+  
+  // 初始化图表
+  setTimeout(() => {
+    if (showSpeedChart.value) {
+      initSpeedChart()
+    }
+    if (showAxleBoxAccelerationChart.value) {
+      initAxleBoxAccelerationChart()
+    }
+    if (showFrameAccelerationChart.value) {
+      initFrameAccelerationChart()
+    }
+  }, 100)
   
   // 开始运行循环
   console.log('开始运行循环')
@@ -615,8 +1004,11 @@ onUnmounted(() => {
   // 销毁速度图表
   destroySpeedChart()
   
-  // 销毁加速度图表
-  destroyAccelerationChart()
+  // 销毁轴箱加速度图表
+  destroyAxleBoxAccelerationChart()
+  
+  // 销毁构架加速度图表
+  destroyFrameAccelerationChart()
 })
 </script>
 
@@ -644,54 +1036,131 @@ onUnmounted(() => {
   min-height: 0;
 }
 
+/* 图表窗口样式 */
+.chart-windows {
+  position: absolute;
+  top: 70px;
+  left: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 20px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.chart-window {
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  width: 280px;
+  height: 180px;
+}
+
+.chart-window h4 {
+  color: #fff;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.chart {
+  width: 100%;
+  height: calc(100% - 24px);
+}
+
 
 .controls-container {
   padding: 10px;
   background-color: #fff;
-  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
-
-.side-panel {
-  width: 300px;
-  background-color: #fff;
-  border-left: 1px solid #ddd;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-/* 加速度下拉框样式 */
-.acceleration-dropdowns {
+.chart-buttons {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-left: auto;
+}
+
+
+
+/* 固定位置的小地图 */
+.minimap-fixed {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  width: 320px;
+  height: 344px;
+}
+
+.minimap-fixed h4 {
+  color: #fff;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.minimap-fixed canvas {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  background-color: #f0f0f0;
+}
+
+/* 固定位置的运行状态 */
+.status-fixed {
+  position: absolute;
+  top: 434px;
+  right: 20px;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  width: 320px;
+}
+
+.status-fixed h4 {
+  color: #fff;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.status-fixed .info-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 10px;
 }
 
-.acceleration-select {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  background-color: #0075ff;
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.3s;
-  width: 120px; /* 设置固定宽度 */
+.status-fixed .info-item .label {
+  color: #ddd;
+  font-size: 12px;
 }
 
-.acceleration-select:hover {
-  background-color: #0066e6;
+.status-fixed .info-item .value {
+  font-weight: bold;
+  color: #fff;
+  font-size: 12px;
 }
 
-.acceleration-select option {
-  background-color: white;
-  color: #333;
+.status-fixed .speed-slider {
+  flex: 1;
+  margin: 0 10px;
 }
+
 
 /* 速度按钮样式 */
 .speed-button {
@@ -703,104 +1172,20 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.3s;
-  width: 120px; /* 设置与下拉框相同的宽度 */
+  width: 120px;
 }
 
 .speed-button:hover {
   background-color: #0066e6 !important;
 }
 
-/* 速度-里程标曲线图表容器样式 */
-.speed-chart-container {
-  margin-top: 20px;
-  margin-bottom: 20px;
-  padding: 1rem;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* 加速度-里程标曲线图表容器样式 */
-.acceleration-chart-container {
-  margin-top: 20px;
-  margin-bottom: 20px;
-  padding: 1rem;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-.chart-title {
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: #606266;
-  margin-bottom: 0.8rem;
-  text-align: center;
-}
-
-.chart {
-  width: 100%;
-  height: 300px;
-}
-
-.info-panel {
-  margin-bottom: 20px;
-}
-
-.info-panel h3 {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  color: #333;
-  font-size: 1.2rem;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.info-item .label {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.info-item .value {
-  font-weight: bold;
-  color: #333;
-}
-
-.speed-slider {
-  flex: 1;
-  margin: 0 0.5rem;
-}
-
-.minimap-container {
-  margin-bottom: 20px;
-  width: 100%;
-  height: 330px;
-  background-color: white;
-  padding: 0.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  border-radius: 4px;
-}
-
-.minimap-container h3 {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  color: #333;
-  font-size: 1.1rem;
-  text-align: center;
-}
-
-#minimapCanvas {
-  display: block;
-  margin: 0 auto;
-  border: 1px solid #ddd;
-  background-color: #f0f0f0;
+.speed-button.active {
+  background-color: #0050b3 !important;
+  box-shadow: 0 2px 4px rgba(0, 80, 179, 0.3);
+  font-weight: 600;
 }
 </style>
+
 
 
 

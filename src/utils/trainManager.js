@@ -33,7 +33,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
       ? '/models_3d/gao.glb' 
       : '/models_3d/tuo.glb'
     
-    console.log(`准备加载第${i+1}个车厢模型 (${isFirst ? '车头' : isLast ? '车尾' : '中间'}): ${modelPath}`)
+    // console.log(`准备加载第${i+1}个车厢模型 (${isFirst ? '车头' : isLast ? '车尾' : '中间'}): ${modelPath}`)
     
     // 保存当前车辆的位置信息，用于回调函数中使用
     const carIndex = i
@@ -44,18 +44,18 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
     loader.load(
       modelPath,
       (gltf) => {
-        console.log('模型加载成功:', modelPath)
+        // console.log('模型加载成功:', modelPath)
         
         const trainModel = gltf.scene
-        console.log('模型包含的子对象数量:', trainModel.children.length)
+        // console.log('模型包含的子对象数量:', trainModel.children.length)
         
         // 计算模型的边界框，以了解模型的实际尺寸
         const box = new THREE.Box3().setFromObject(trainModel)
         const size = new THREE.Vector3()
         box.getSize(size)
-        console.log('模型尺寸:', size)
-        console.log('模型边界框最小点:', box.min)
-        console.log('模型边界框最大点:', box.max)
+        // console.log('模型尺寸:', size)
+        // console.log('模型边界框最小点:', box.min)
+        // console.log('模型边界框最大点:', box.max)
         
         // 设置模型初始状态，校准模型轴向
         // 假设模型长轴方向沿Z轴，这里进行校准
@@ -90,7 +90,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
           // 根据模型尺寸计算偏移量，确保与中间车间隔统一
           // 头尾车长度约27单位，驾驶室中心靠前
           const offsetDistance = size.z * 0.3 // 偏移量为模型长度的30%
-          console.log('头尾车偏移量:', offsetDistance)
+          // console.log('头尾车偏移量:', offsetDistance)
           // 根据车辆位置调整偏移方向
           if (carIsFirst) {
             // 车头需要向前偏移
@@ -108,26 +108,26 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
         
         scene.add(trainModel)
         trains[carIndex] = trainModel // 根据carIndex将模型添加到正确位置，确保数组索引与车辆索引匹配
-        console.log('模型添加到场景，当前列车数量:', trains.length)
-        console.log('列车', carIndex, '类型:', carIsFirst ? '车头 (motor_car_transparent.glb)' : carIsLast ? '车尾 (motor_car_transparent.glb)' : '中间 (traction_car_transparent.glb)')
-        console.log('模型位置:', trainModel.position)
-        console.log('模型类型:', carIsFirst ? '车头' : carIsLast ? '车尾' : '中间')
-        console.log('模型朝向:', trainModel.rotation.y)
+        // console.log('模型添加到场景，当前列车数量:', trains.length)
+        // console.log('列车', carIndex, '类型:', carIsFirst ? '车头 (motor_car_transparent.glb)' : carIsLast ? '车尾 (motor_car_transparent.glb)' : '中间 (traction_car_transparent.glb)')
+        // console.log('模型位置:', trainModel.position)
+        // console.log('模型类型:', carIsFirst ? '车头' : carIsLast ? '车尾' : '中间')
+        // console.log('模型朝向:', trainModel.rotation.y)
         
         // 初始化位置
         // 检查是否所有模型都已加载完成
         const allLoaded = trains.every(train => train !== undefined) && trains.length >= trainCount
         if (trackPath && allLoaded) {
-          console.log('所有模型加载完成，开始初始化位置')
+          // console.log('所有模型加载完成，开始初始化位置')
           updateTrainPosition(0)
-          console.log('所有模型加载完成，初始化位置')
+          // console.log('所有模型加载完成，初始化位置')
         }
       },
       (xhr) => {
-        console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+        // console.log((xhr.loaded / xhr.total * 100) + '% loaded')
       },
       (error) => {
-        console.error('模型加载失败:', modelPath, error)
+        // console.error('模型加载失败:', modelPath, error)
         // 如果模型加载失败，创建一个简单的立方体作为替代
         const fallbackGeometry = new THREE.BoxGeometry(3, 2, 6)
         const fallbackMaterial = new THREE.MeshStandardMaterial({ 
@@ -149,7 +149,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
           // 头尾车（使用motor_car_transparent.glb）需要位置偏移
           // 假设模型长度约27单位，驾驶室中心靠前
           const offsetDistance = 27 * 0.3 // 偏移量为模型长度的30%
-          console.log('头尾车备用模型偏移量:', offsetDistance)
+          // console.log('头尾车备用模型偏移量:', offsetDistance)
           // 根据车辆位置调整偏移方向
           if (carIsFirst) {
             // 车头需要向前偏移
@@ -176,17 +176,17 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
         
         scene.add(fallbackTrain)
         trains[carIndex] = fallbackTrain // 根据carIndex将模型添加到正确位置，确保数组索引与车辆索引匹配
-        console.log('使用立方体替代，当前列车数量:', trains.length)
-        console.log('列车', carIndex, '类型:', carIsFirst ? '车头 (motor_car_transparent.glb)' : carIsLast ? '车尾 (motor_car_transparent.glb)' : '中间 (traction_car_transparent.glb)')
-        console.log('替代模型类型:', carIsFirst ? '车头' : carIsLast ? '车尾' : '中间')
+        // console.log('使用立方体替代，当前列车数量:', trains.length)
+        // console.log('列车', carIndex, '类型:', carIsFirst ? '车头 (motor_car_transparent.glb)' : carIsLast ? '车尾 (motor_car_transparent.glb)' : '中间 (traction_car_transparent.glb)')
+        // console.log('替代模型类型:', carIsFirst ? '车头' : carIsLast ? '车尾' : '中间')
         
         // 初始化位置
         // 检查是否所有模型都已加载完成
         const allLoaded = trains.every(train => train !== undefined) && trains.length >= trainCount
         if (trackPath && allLoaded) {
-          console.log('所有模型加载完成，开始初始化位置')
+          // console.log('所有模型加载完成，开始初始化位置')
           updateTrainPosition(0)
-          console.log('所有模型加载完成，初始化位置')
+          // console.log('所有模型加载完成，初始化位置')
         }
       }
     )

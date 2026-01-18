@@ -1,37 +1,43 @@
 <template>
   <div class="wheel-rail-contact-container">
     <div class="viewer-container">
-      <div ref="canvasContainer" class="canvas-container"></div>
       <div class="controls-container">
         <el-button @click="toggleAnimation">{{ isAnimating ? '停止运行' : '开始运行' }}</el-button>
         <el-button @click="resetAnimation">重置位置</el-button>
-        <el-checkbox v-model="cameraFollow" style="margin-left: 10px;">相机跟随</el-checkbox>
-        <el-slider v-model="progress" :min="0" :max="1" :step="0.001" @change="onProgressChange"></el-slider>
+        <div class="chart-buttons">
+          <button class="speed-button" :class="{ 'active': showWheelRailForceChart }" @click="toggleWheelRailForceChart">轮轨力</button>
+          <button class="speed-button" :class="{ 'active': showWheelLoadReductionChart }" @click="toggleWheelLoadReductionChart">轮重减载率</button>
+          <button class="speed-button" :class="{ 'active': showDerailmentCoefficientChart }" @click="toggleDerailmentCoefficientChart">脱轨系数</button>
+        </div>
       </div>
-    </div>
-    <div class="side-panel">
-      <div class="section">
-        <h4>轮轨几何关系</h4>
-        <el-form :model="wheelSetParams" label-width="100px">
-          <el-form-item label="轮对横移量">
-            <el-input-number v-model="wheelSetParams.axleLength" :min="0.5" :max="2" :step="0.1" @change="updateWheelSet"></el-input-number>
-          </el-form-item>
-          <el-form-item label="轮对I摇头角">
-            <el-input-number v-model="wheelSetParams.wheelRadius" :min="0.2" :max="1" :step="0.01" @change="updateWheelSet"></el-input-number>
-          </el-form-item>
-          <el-form-item label="轮轨接触角">
-            <el-input-number v-model="wheelSetParams.axleRadius" :min="0.03" :max="0.1" :step="0.005" @change="updateWheelSet"></el-input-number>
-          </el-form-item>
-        </el-form>
+      <div ref="canvasContainer" class="canvas-container"></div>
+      
+      <!-- 固定位置的曲线图窗 -->
+      <div class="chart-windows">
+        <div v-if="showWheelRailForceChart" class="chart-window">
+          <h4>轮轨力</h4>
+          <div ref="wheelRailForceChartRef" class="chart"></div>
+        </div>
+        <div v-if="showWheelLoadReductionChart" class="chart-window">
+          <h4>轮重减载率</h4>
+          <div ref="wheelLoadReductionChartRef" class="chart"></div>
+        </div>
+        <div v-if="showDerailmentCoefficientChart" class="chart-window">
+          <h4>脱轨系数</h4>
+          <div ref="derailmentCoefficientChartRef" class="chart"></div>
+        </div>
       </div>
-      <div class="section">
-        <h4>关注轮轴位置</h4>
-        <div class="camera-target-buttons"> 
-           <el-button @click="setCameraTarget('BOG1-AX1')" :class="{ 'active': cameraTarget === 'BOG1-AX1' }">转向架1-轴1</el-button> 
-           <el-button @click="setCameraTarget('BOG1-AX2')" :class="{ 'active': cameraTarget === 'BOG1-AX2' }">转向架1-轴2</el-button> 
-           <el-button @click="setCameraTarget('BOG2-AX1')" :class="{ 'active': cameraTarget === 'BOG2-AX1' }">转向架2-轴1</el-button> 
-           <el-button @click="setCameraTarget('BOG2-AX2')" :class="{ 'active': cameraTarget === 'BOG2-AX2' }">转向架2-轴2</el-button> 
-         </div>
+      
+      <!-- 固定位置的小地图 -->
+      <div class="minimap-fixed">
+        <h4>列车轨迹小地图</h4>
+        <canvas id="minimapCanvas" width="300" height="300"></canvas>
+      </div>
+      
+      <!-- 固定位置的列车实时运行视窗 -->
+      <div class="realtime-view-fixed" @click="navigateToMarshallingVisualization">
+        <h4>列车实时运行</h4>
+        <div ref="realtimeViewContainer" class="realtime-view"></div>
       </div>
     </div>
   </div>
@@ -39,14 +45,25 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { trackStore } from '../store/trackStore'
 import { createTrackPathFromSegments, estimatePathLength } from '../utils/trackManager'
+import { initMinimap, updateMinimap, setTrackPath } from '../utils/minimapManager'
+import { initThreeScene, renderScene, followTrain } from '../utils/sceneManager'
+import { createTrack as createManagerTrack, updateRailSegments, getTrackState } from '../utils/trackManager'
+import { createTrain, updateTrainPosition, getTrains, setTrackInfo } from '../utils/trainManager'
+import * as echarts from 'echarts'
+import { webSocketAPI } from '../utils/api'
 
 const canvasContainer = ref(null)
+let realtimeViewContainer = ref(null)
+const router = useRouter()
 let scene, camera, renderer, controls
+let realtimeSceneInfo = null
+let trackPath, trackLength
 let baseTrackPath, leftTrackPath, rightTrackPath
 let leftRail, rightRail
 let wheelSet, wheels, axle
@@ -56,6 +73,46 @@ let fourthWheelSet, fourthWheels
 let sleepers = []
 let bogie = null
 let secondBogie = null
+
+// 图表引用
+const wheelLoadReductionChartRef = ref(null)
+const derailmentCoefficientChartRef = ref(null)
+const wheelRailForceChartRef = ref(null)
+
+// 图表显示状态
+const showWheelRailForceChart = ref(true)
+const showWheelLoadReductionChart = ref(true)
+const showDerailmentCoefficientChart = ref(true)
+
+// 图表实例
+let wheelLoadReductionChart = null
+let derailmentCoefficientChart = null
+let wheelRailForceChart = null
+
+// WebSocket连接
+let wheelLoadReductionWS = null
+let derailmentCoefficientWS = null
+let wheelRailForceWS = null
+
+// 图表数据存储
+const wheelLoadReductionData = reactive({
+  mileages: [],
+  leftReductionRates: [],
+  rightReductionRates: []
+})
+
+const derailmentCoefficientData = reactive({
+  mileages: [],
+  leftCoefficients: [],
+  rightCoefficients: []
+})
+
+const wheelRailForceData = reactive({
+  mileages: [],
+  verticalForces: [],
+  lateralForces: [],
+  longitudinalForces: []
+})
 
 // 轨道元素管理
 let trackElements = {
@@ -82,7 +139,7 @@ let animationId
 let isAnimating = ref(false)
 let progress = ref(0)
 let cameraFollow = ref(true)
-let cameraTarget = ref('BOG1-AX1') // 默认跟踪第一个转向架的第一个轴
+let cameraTarget = ref('BOG2-AX1') // 默认跟踪第二个转向架的第一个轴
 let cameraTargetPosition = new THREE.Vector3(-3, 8, -10) // 初始化为与相机位置一致
 let cameraTargetLookAt = new THREE.Vector3(0, 2, 0) // 初始化为默认目标点
 let controlsTarget = new THREE.Vector3(0, 2, 0) // 初始化为默认目标点
@@ -133,16 +190,26 @@ function initScene() {
   createEnvironmentMap()
   
   // 创建地面
-  createGround()
+  createWheelRailGround()
   
   // 创建轨道
-  createTrack()
+  createWheelRailTrack()
   
   // 创建轮对
   createWheelSet()
   
   // 渲染场景
   animate()
+  
+  // 初始化小地图
+  const minimapCanvas = document.getElementById('minimapCanvas')
+  if (minimapCanvas) {
+    initMinimap(minimapCanvas)
+    // 设置轨道路径
+    if (baseTrackPath) {
+      setTrackPath(baseTrackPath)
+    }
+  }
 }
 
 // 创建环境贴图
@@ -197,7 +264,7 @@ function addLights() {
 }
 
 // 创建地面
-function createGround() {
+function createWheelRailGround() {
   // 清除旧的地面和网格线
   trackElements.ground.forEach(ground => {
     scene.remove(ground)
@@ -323,7 +390,7 @@ function offsetTrackPath(basePath, offsetDistance) {
 }
 
 // 创建轨道
-function createTrack() {
+function createWheelRailTrack() {
   // 创建基础轨道路径
   const trackSegments = trackStore.getHorizontalSegments()
   baseTrackPath = createTrackPathFromSegments(trackSegments)
@@ -1504,6 +1571,12 @@ function animate() {
       progress.value = 0
     }
     updateWheelSetPosition(progress.value)
+    
+    // 更新实时运行视窗的列车位置
+    if (realtimeSceneInfo) {
+      const realtimeProgress = progress.value
+      updateTrainPosition(realtimeProgress)
+    }
   }
   
   // 相机平滑跟随
@@ -1528,6 +1601,19 @@ function animate() {
   
   controls.update()
   renderer.render(scene, camera)
+  
+  // 渲染实时运行视窗
+  if (realtimeSceneInfo) {
+    // 获取列车并让相机跟随
+    const trains = getTrains()
+    if (trains && trains.length > 0) {
+      followTrain(trains)
+    }
+    renderScene()
+  }
+  
+  // 更新小地图
+  updateMinimap(camera, [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet].filter(Boolean))
 }
 
 // 开始运行
@@ -1554,6 +1640,21 @@ function resetAnimation() {
   isAnimating.value = false
   progress.value = 0
   updateWheelSetPosition(0)
+}
+
+// 切换轮轨力图表显示
+function toggleWheelRailForceChart() {
+  showWheelRailForceChart.value = !showWheelRailForceChart.value
+}
+
+// 切换轮重减载率图表显示
+function toggleWheelLoadReductionChart() {
+  showWheelLoadReductionChart.value = !showWheelLoadReductionChart.value
+}
+
+// 切换脱轨系数图表显示
+function toggleDerailmentCoefficientChart() {
+  showDerailmentCoefficientChart.value = !showDerailmentCoefficientChart.value
 }
 
 // 设置关注轮轴位置
@@ -1684,12 +1785,92 @@ function onWindowResize() {
   camera.aspect = canvasContainer.value.clientWidth / canvasContainer.value.clientHeight
   camera.updateProjectionMatrix()
   renderer.setSize(canvasContainer.value.clientWidth, canvasContainer.value.clientHeight)
+  
+  // 调整图表大小
+  wheelLoadReductionChart?.resize()
+  derailmentCoefficientChart?.resize()
+  wheelRailForceChart?.resize()
 }
 
 // 组件挂载时初始化
 onMounted(() => {
   initScene()
   window.addEventListener('resize', onWindowResize)
+  
+  // 初始化实时运行视窗
+  if (realtimeViewContainer.value) {
+    realtimeSceneInfo = initThreeScene(realtimeViewContainer.value)
+    
+    // 创建轨道
+    const { trackPath: newTrackPath, trackLength: newTrackLength } = createManagerTrack(realtimeSceneInfo.scene)
+    trackPath = newTrackPath
+    trackLength = newTrackLength
+    
+    // 设置轨道信息
+    setTrackInfo(trackPath, trackLength)
+    setTrackPath(trackPath)
+    
+    // 创建列车
+    createTrain(realtimeSceneInfo.scene, trackPath, trackLength)
+  }
+  
+  // 初始化图表
+  initWheelLoadReductionChart()
+  initDerailmentCoefficientChart()
+  initWheelRailForceChart()
+  
+  // 建立WebSocket连接
+  wheelLoadReductionWS = webSocketAPI.connectWheelLoadReduction(
+    handleWheelLoadReductionMessage,
+    (error) => console.error('轮重减载率WebSocket连接错误:', error),
+    () => console.log('轮重减载率WebSocket连接已关闭')
+  )
+  
+  derailmentCoefficientWS = webSocketAPI.connectDerailmentCoefficient(
+    handleDerailmentCoefficientMessage,
+    (error) => console.error('脱轨系数WebSocket连接错误:', error),
+    () => console.log('脱轨系数WebSocket连接已关闭')
+  )
+  
+  wheelRailForceWS = webSocketAPI.connectWheelRailForce(
+    handleWheelRailForceMessage,
+    (error) => console.error('轮轨力WebSocket连接错误:', error),
+    () => console.log('轮轨力WebSocket连接已关闭')
+  )
+})
+
+// 监听图表显示状态变化，重新初始化图表
+watch(showWheelRailForceChart, (newVal) => {
+  if (newVal) {
+    setTimeout(() => {
+      initWheelRailForceChart()
+      if (wheelRailForceData.mileages.length > 0) {
+        updateWheelRailForceChart()
+      }
+    }, 0)
+  }
+})
+
+watch(showWheelLoadReductionChart, (newVal) => {
+  if (newVal) {
+    setTimeout(() => {
+      initWheelLoadReductionChart()
+      if (wheelLoadReductionData.mileages.length > 0) {
+        updateWheelLoadReductionChart()
+      }
+    }, 0)
+  }
+})
+
+watch(showDerailmentCoefficientChart, (newVal) => {
+  if (newVal) {
+    setTimeout(() => {
+      initDerailmentCoefficientChart()
+      if (derailmentCoefficientData.mileages.length > 0) {
+        updateDerailmentCoefficientChart()
+      }
+    }, 0)
+  }
 })
 
 // 组件卸载时清理
@@ -1704,7 +1885,590 @@ onUnmounted(() => {
   if (renderer) {
     renderer.dispose()
   }
+  
+  // 销毁图表
+  wheelLoadReductionChart?.dispose()
+  derailmentCoefficientChart?.dispose()
+  wheelRailForceChart?.dispose()
+  
+  // 关闭WebSocket连接
+  webSocketAPI.disconnect(wheelLoadReductionWS)
+  webSocketAPI.disconnect(derailmentCoefficientWS)
+  webSocketAPI.disconnect(wheelRailForceWS)
 })
+
+// 导航到列车实时运行页面
+function navigateToMarshallingVisualization() {
+  router.push('/marshalling-visualization')
+}
+
+// 初始化轮重减载率曲线
+const initWheelLoadReductionChart = () => {
+  if (!wheelLoadReductionChartRef.value) return
+  
+  wheelLoadReductionChart = echarts.init(wheelLoadReductionChartRef.value)
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        return `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>` +
+               `左侧轮重减载率: ${params[0].data.toFixed(3)}<br/>` +
+               `右侧轮重减载率: ${params[1].data.toFixed(3)}`;
+      }
+    },
+    legend: {
+      data: ['左侧轮重减载率', '右侧轮重减载率'],
+      top: 10,
+      textStyle: {
+        fontSize: 10,
+        color: '#fff'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '20%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: [],
+      name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '轮重减载率',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      splitLine: {
+        lineStyle: {
+          type: 'dashed',
+          color: 'rgba(255,255,255,0.1)'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    series: [
+      {
+        name: '左侧轮重减载率',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#F56C6C',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#F56C6C'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(245, 108, 108, 0.5)' },
+            { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+          ])
+        }
+      },
+      {
+        name: '右侧轮重减载率',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#409EFF',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#409EFF'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(64, 158, 255, 0.5)' },
+            { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
+          ])
+        }
+      }
+    ],
+    markLine: {
+      data: [
+        {
+          name: '安全阈值',
+          yAxis: 0.6,
+          lineStyle: {
+            color: '#E6A23C',
+            type: 'dashed'
+          },
+          label: {
+            formatter: '安全阈值: 0.6',
+            color: '#fff',
+            fontSize: 9
+          }
+        }
+      ]
+    }
+  }
+  
+  wheelLoadReductionChart.setOption(option)
+}
+
+// 更新轮重减载率图表数据
+const updateWheelLoadReductionChart = () => {
+  if (!wheelLoadReductionChart) return
+  
+  wheelLoadReductionChart.setOption({
+    xAxis: {
+      data: wheelLoadReductionData.mileages
+    },
+    series: [
+      {
+        data: wheelLoadReductionData.leftReductionRates
+      },
+      {
+        data: wheelLoadReductionData.rightReductionRates
+      }
+    ]
+  })
+}
+
+// 处理轮重减载率WebSocket消息
+const handleWheelLoadReductionMessage = (message) => {
+  if (message.type === 'historical_data') {
+    // 处理历史数据
+    const data = message.data;
+    wheelLoadReductionData.mileages = data.map(item => item.mileage);
+    wheelLoadReductionData.leftReductionRates = data.map(item => item.left);
+    wheelLoadReductionData.rightReductionRates = data.map(item => item.right);
+    updateWheelLoadReductionChart();
+  } else if (message.type === 'realtime_data') {
+    // 处理实时数据
+    const dataPoint = message.data;
+    
+    // 添加新数据点
+    wheelLoadReductionData.mileages.push(dataPoint.mileage);
+    wheelLoadReductionData.leftReductionRates.push(dataPoint.left);
+    wheelLoadReductionData.rightReductionRates.push(dataPoint.right);
+    
+    // 保持数据点在1000km范围内
+    if (wheelLoadReductionData.mileages.length > 0 && 
+        wheelLoadReductionData.mileages[wheelLoadReductionData.mileages.length - 1] - 
+        wheelLoadReductionData.mileages[0] > 1000000) {
+      wheelLoadReductionData.mileages.shift();
+      wheelLoadReductionData.leftReductionRates.shift();
+      wheelLoadReductionData.rightReductionRates.shift();
+    }
+    
+    updateWheelLoadReductionChart();
+  }
+}
+
+// 初始化脱轨系数曲线
+const initDerailmentCoefficientChart = () => {
+  if (!derailmentCoefficientChartRef.value) return
+  
+  derailmentCoefficientChart = echarts.init(derailmentCoefficientChartRef.value)
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        return `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>` +
+               `左侧脱轨系数: ${params[0].data.toFixed(3)}<br/>` +
+               `右侧脱轨系数: ${params[1].data.toFixed(3)}`;
+      }
+    },
+    legend: {
+      data: ['左侧脱轨系数', '右侧脱轨系数'],
+      top: 10,
+      textStyle: {
+        fontSize: 10,
+        color: '#fff'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '20%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: [],
+      name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '脱轨系数',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      splitLine: {
+        lineStyle: {
+          type: 'dashed',
+          color: 'rgba(255,255,255,0.1)'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    series: [
+      {
+        name: '左侧脱轨系数',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#67C23A',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#67C23A'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(103, 194, 58, 0.5)' },
+            { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+          ])
+        }
+      },
+      {
+        name: '右侧脱轨系数',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#E6A23C',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#E6A23C'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(230, 162, 60, 0.5)' },
+            { offset: 1, color: 'rgba(230, 162, 60, 0.1)' }
+          ])
+        }
+      }
+    ],
+    markLine: {
+      data: [
+        {
+          name: '安全阈值',
+          yAxis: 1.2,
+          lineStyle: {
+            color: '#F56C6C',
+            type: 'dashed'
+          },
+          label: {
+            formatter: '安全阈值: 1.2',
+            color: '#fff',
+            fontSize: 9
+          }
+        }
+      ]
+    }
+  }
+  
+  derailmentCoefficientChart.setOption(option)
+}
+
+// 更新脱轨系数图表数据
+const updateDerailmentCoefficientChart = () => {
+  if (!derailmentCoefficientChart) return
+  
+  derailmentCoefficientChart.setOption({
+    xAxis: {
+      data: derailmentCoefficientData.mileages
+    },
+    series: [
+      {
+        data: derailmentCoefficientData.leftCoefficients
+      },
+      {
+        data: derailmentCoefficientData.rightCoefficients
+      }
+    ]
+  })
+}
+
+// 处理脱轨系数WebSocket消息
+const handleDerailmentCoefficientMessage = (message) => {
+  if (message.type === 'historical_data') {
+    // 处理历史数据
+    const data = message.data;
+    derailmentCoefficientData.mileages = data.map(item => item.mileage);
+    derailmentCoefficientData.leftCoefficients = data.map(item => item.left);
+    derailmentCoefficientData.rightCoefficients = data.map(item => item.right);
+    updateDerailmentCoefficientChart();
+  } else if (message.type === 'realtime_data') {
+    // 处理实时数据
+    const dataPoint = message.data;
+    
+    // 添加新数据点
+    derailmentCoefficientData.mileages.push(dataPoint.mileage);
+    derailmentCoefficientData.leftCoefficients.push(dataPoint.left);
+    derailmentCoefficientData.rightCoefficients.push(dataPoint.right);
+    
+    // 保持数据点在1000km范围内
+    if (derailmentCoefficientData.mileages.length > 0 && 
+        derailmentCoefficientData.mileages[derailmentCoefficientData.mileages.length - 1] - 
+        derailmentCoefficientData.mileages[0] > 1000000) {
+      derailmentCoefficientData.mileages.shift();
+      derailmentCoefficientData.leftCoefficients.shift();
+      derailmentCoefficientData.rightCoefficients.shift();
+    }
+    
+    updateDerailmentCoefficientChart();
+  }
+}
+
+// 初始化轮轨力曲线
+const initWheelRailForceChart = () => {
+  if (!wheelRailForceChartRef.value) return
+  
+  wheelRailForceChart = echarts.init(wheelRailForceChartRef.value)
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        let result = `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>`;
+        params.forEach(param => {
+          result += `${param.seriesName}: ${param.data.toFixed(2)}kN<br/>`;
+        });
+        return result;
+      }
+    },
+    legend: {
+      data: ['轮轨垂向力', '轮轨横向力', '轮轨纵向力'],
+      top: 10,
+      textStyle: {
+        fontSize: 10,
+        color: '#fff'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '20%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: [],
+      name: '里程标 (km)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}km',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '轮轨力 (kN)',
+      nameTextStyle: {
+        color: '#fff',
+        fontSize: 10
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#aaa'
+        }
+      },
+      splitLine: {
+        lineStyle: {
+          type: 'dashed',
+          color: 'rgba(255,255,255,0.1)'
+        }
+      },
+      axisLabel: {
+        formatter: '{value}kN',
+        color: '#fff',
+        fontSize: 9
+      }
+    },
+    series: [
+      {
+        name: '轮轨垂向力',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#409EFF',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#409EFF'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(64, 158, 255, 0.5)' },
+            { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
+          ])
+        }
+      },
+      {
+        name: '轮轨横向力',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#F56C6C',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#F56C6C'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(245, 108, 108, 0.5)' },
+            { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+          ])
+        }
+      },
+      {
+        name: '轮轨纵向力',
+        type: 'line',
+        stack: 'Total',
+        data: [],
+        lineStyle: {
+          color: '#67C23A',
+          width: 1.5
+        },
+        itemStyle: {
+          color: '#67C23A'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(103, 194, 58, 0.5)' },
+            { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+          ])
+        }
+      }
+    ]
+  }
+  
+  wheelRailForceChart.setOption(option)
+}
+
+// 更新轮轨力图表数据
+const updateWheelRailForceChart = () => {
+  if (!wheelRailForceChart) return
+  
+  wheelRailForceChart.setOption({
+    xAxis: {
+      data: wheelRailForceData.mileages
+    },
+    series: [
+      {
+        data: wheelRailForceData.verticalForces
+      },
+      {
+        data: wheelRailForceData.lateralForces
+      },
+      {
+        data: wheelRailForceData.longitudinalForces
+      }
+    ]
+  })
+}
+
+// 处理轮轨力WebSocket消息
+const handleWheelRailForceMessage = (message) => {
+  if (message.type === 'historical_data') {
+    // 处理历史数据
+    const data = message.data;
+    wheelRailForceData.mileages = data.map(item => item.mileage);
+    wheelRailForceData.verticalForces = data.map(item => item.vertical);
+    wheelRailForceData.lateralForces = data.map(item => item.lateral);
+    wheelRailForceData.longitudinalForces = data.map(item => item.longitudinal);
+    updateWheelRailForceChart();
+  } else if (message.type === 'realtime_data') {
+    // 处理实时数据
+    const dataPoint = message.data;
+    
+    // 添加新数据点
+    wheelRailForceData.mileages.push(dataPoint.mileage);
+    wheelRailForceData.verticalForces.push(dataPoint.vertical);
+    wheelRailForceData.lateralForces.push(dataPoint.lateral);
+    wheelRailForceData.longitudinalForces.push(dataPoint.longitudinal);
+    
+    // 保持数据点在1000km范围内
+    if (wheelRailForceData.mileages.length > 0 && 
+        wheelRailForceData.mileages[wheelRailForceData.mileages.length - 1] - 
+        wheelRailForceData.mileages[0] > 1000000) {
+      wheelRailForceData.mileages.shift();
+      wheelRailForceData.verticalForces.shift();
+      wheelRailForceData.lateralForces.shift();
+      wheelRailForceData.longitudinalForces.shift();
+    }
+    
+    updateWheelRailForceChart();
+  }
+}
 </script>
 
 <style scoped>
@@ -1728,55 +2492,142 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* 图表窗口样式 */
+.chart-windows {
+  position: absolute;
+  top: 70px;
+  left: 340px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 20px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.chart-window {
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  width: 280px;
+  height: 180px;
+}
+
+.chart-window h4 {
+  color: #fff;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.chart {
+  width: 100%;
+  height: calc(100% - 24px);
+}
+
 .controls-container {
   padding: 10px;
   background-color: #fff;
-  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.side-panel {
-  width: 300px;
-  background-color: #fff;
-  border-left: 1px solid #ddd;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.camera-target-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+.chart-buttons {
+  display: flex;
   gap: 10px;
-  margin-top: 10px;
-  width: 100%;
+  margin-left: auto;
 }
 
-.camera-target-buttons .el-button {
-  background-color: #0075ff;
-  color: white;
+.speed-button {
+  padding: 0.5rem 1rem;
   border: none;
-  width: 100%;
-  min-width: 0;
+  border-radius: 4px;
+  background-color: #0075ff !important;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+  width: 120px;
+}
+
+.speed-button:hover {
+  background-color: #0066e6 !important;
+}
+
+.speed-button.active {
+  background-color: #0050b3 !important;
+  box-shadow: 0 2px 4px rgba(0, 80, 179, 0.3);
+  font-weight: 600;
+}
+
+/* 固定位置的列车实时运行视窗 */
+.realtime-view-fixed {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 400px;
+  height: 300px;
+  background-color: rgba(10, 25, 47, 0.8);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.realtime-view-fixed:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.realtime-view-fixed h4 {
+  color: #fff;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
   text-align: center;
 }
 
-.camera-target-buttons .el-button:hover {
-  background-color: #1890ff;
+.realtime-view {
+  width: 100%;
+  height: 250px;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-.camera-target-buttons .el-button.active {
-  background-color: #0050b3;
+.minimap-fixed {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  width: 300px;
+  height: 344px;
+  background-color: rgba(10, 25, 47, 0.8);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.section {
-  margin-bottom: 20px;
-}
-
-.section h4 {
+.minimap-fixed h4 {
+  color: #fff;
+  margin-top: 0;
   margin-bottom: 10px;
-  color: #333;
+  font-size: 14px;
+  text-align: center;
+}
+
+.minimap-fixed canvas {
+  width: 100%;
+  height: 300px;
+  border-radius: 4px;
+  background-color: #b2d1fd;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 </style>

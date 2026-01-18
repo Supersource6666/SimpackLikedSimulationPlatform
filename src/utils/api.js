@@ -213,6 +213,32 @@ export const webSocketAPI = {
     return ws;
   },
   
+  // 建立轮轨力实时数据WebSocket连接
+  connectWheelRailForce(onMessage, onError, onClose) {
+    const ws = new WebSocket(`${WS_BASE_URL}/evaluation-results/wheel-rail-force`);
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (error) {
+        console.error('WebSocket消息解析错误:', error);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket错误:', error);
+      if (onError) onError(error);
+    };
+    
+    ws.onclose = (event) => {
+      console.log('WebSocket连接关闭:', event);
+      if (onClose) onClose(event);
+    };
+    
+    return ws;
+  },
+  
   // 关闭WebSocket连接
   disconnect(ws) {
     if (ws && ws.readyState === WebSocket.OPEN) {

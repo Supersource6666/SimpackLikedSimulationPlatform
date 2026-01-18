@@ -14,7 +14,6 @@ export function initMinimap(canvas) {
   minimapCanvas.width = minimapSize.width
   minimapCanvas.height = minimapSize.height
   minimapCanvas.style.border = '1px solid #ddd'
-  minimapCanvas.style.backgroundColor = '#f0f0f0'
   
   return { minimapCanvas, minimapCtx }
 }
