@@ -267,6 +267,11 @@ function onDrag(event) {
   newX = Math.max(0, Math.min(newX, containerWidth - 10))
   newY = Math.max(0, Math.min(newY, containerHeight - 10))
   
+  // Adjust minimap boundaries to prevent it from being dragged too low
+  if (activeWindow === 'minimap') {
+    newY = Math.max(100, Math.min(newY, window.innerHeight - 400))
+  }
+  
   // Update position based on window type
   switch (activeWindow) {
     case 'wheelRailForce':
@@ -3698,7 +3703,7 @@ const updateSpeedChart = () => {
   position: absolute;
   top: 80px;
   left: 350px;
-  right: 10px;
+  right: 280px;
   bottom: 250px;
   z-index: 100;
   display: flex;
