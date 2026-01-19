@@ -31,6 +31,7 @@
           <button class="speed-button" :class="{ 'active': showWheelRailForceChart }" @click="toggleWheelRailForceChart">轮轨力</button>
           <button class="speed-button" :class="{ 'active': showWheelLoadReductionChart }" @click="toggleWheelLoadReductionChart">轮重减载率</button>
           <button class="speed-button" :class="{ 'active': showDerailmentCoefficientChart }" @click="toggleDerailmentCoefficientChart">脱轨系数</button>
+          <button class="speed-button" :class="{ 'active': showSpeedChart }" @click="toggleSpeedChart">速度</button>
         </div>
         
         <!-- 图表窗口容器 -->
@@ -79,8 +80,11 @@
       </div>
       
       <!-- 固定位置的小地图 -->
-      <div v-if="showMinimap" class="minimap-fixed">
-        <div class="window-header">
+      <div v-if="showMinimap" class="minimap-fixed draggable" 
+           :style="{ left: minimapPosition.x + 'px', top: minimapPosition.y + 'px' }">
+        <div class="window-header draggable-header" 
+             @mousedown="startDrag($event, 'minimap')"
+             @touchstart="startDrag($event, 'minimap')">
           <h4>运行轨迹</h4>
           <button class="close-button" @click="toggleMinimap">×</button>
         </div>
@@ -155,10 +159,11 @@ const showWheelLoadReductionChart = ref(true)
 const showDerailmentCoefficientChart = ref(true)
 
 // Chart window positions
-const wheelRailForcePosition = ref({ x: 0, y: 0 })
-const wheelLoadReductionPosition = ref({ x: 300, y: 0 })
-const derailmentCoefficientPosition = ref({ x: 600, y: 0 })
-const speedPosition = ref({ x: 0, y: 300 })
+const wheelRailForcePosition = ref({ x: 50, y: 0 })
+const wheelLoadReductionPosition = ref({ x: 350, y: 0 })
+const derailmentCoefficientPosition = ref({ x: 350, y: 210 })
+const speedPosition = ref({ x: 50, y: 210 })
+const minimapPosition = ref({ x: 20, y: 350 })
 
 // Drag functionality
 let isDragging = false
@@ -215,6 +220,10 @@ function startDrag(event, windowType) {
     case 'speed':
       windowStartX = speedPosition.value.x
       windowStartY = speedPosition.value.y
+      break
+    case 'minimap':
+      windowStartX = minimapPosition.value.x
+      windowStartY = minimapPosition.value.y
       break
   }
   
@@ -276,6 +285,10 @@ function onDrag(event) {
       speedPosition.value.x = newX
       speedPosition.value.y = newY
       break
+    case 'minimap':
+      minimapPosition.value.x = newX
+      minimapPosition.value.y = newY
+      break
   }
   
   // Prevent default for touch events to avoid scrolling
@@ -298,7 +311,7 @@ function stopDrag() {
 // 视窗显示状态
 const showMinimap = ref(false)
 const showMarshalling = ref(true)
-const showSpeedChart = ref(false)
+const showSpeedChart = ref(true)
 
 // 状态信息
 const currentTime = ref('')
@@ -3684,8 +3697,8 @@ const updateSpeedChart = () => {
 .chart-windows {
   position: absolute;
   top: 80px;
-  left: 270px;
-  right: 400px;
+  left: 350px;
+  right: 10px;
   bottom: 250px;
   z-index: 100;
   display: flex;
@@ -3923,8 +3936,6 @@ const updateSpeedChart = () => {
 
 .minimap-fixed {
   position: absolute;
-  top: 350px;
-  left: 20px;
   width: 280px;
   max-width: calc(100% - 40px);
   height: 190px;

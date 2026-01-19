@@ -55,7 +55,7 @@
                 @click="navigate('/wheel-rail-contact')"
               >
                 <div class="menu-icon">🔍</div>
-                <div class="menu-text">轮轨力反演分析</div>
+                <div class="menu-text">轮轨力反演与分析</div>
               </div>
             </div>
           </div>
