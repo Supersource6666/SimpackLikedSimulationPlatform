@@ -1,17 +1,17 @@
 <template>
   <div class="sidebar">
     <div class="menu-items">
-      <!-- 子系统部分 -->
+      <!-- 孪生子系统部分 -->
       <div class="menu-group">
         <div class="menu-group-title collapsible" @click="toggleGroup('projectFunctions')">
-          <span>子系统</span>
+          <span>孪生子系统</span>
           <span class="collapse-icon">{{ collapsedGroups.projectFunctions ? '▶️' : '▼️' }}</span>
         </div>
         <div v-if="!collapsedGroups.projectFunctions" class="menu-group-content">
-          <!-- 动力学参数部分 -->
+          <!-- 车辆动力学参数部分 -->
           <div class="menu-subgroup">
             <div class="menu-group-title collapsible" @click="toggleGroup('dynamicsParams')">
-              <span>动力学参数</span>
+              <span>车辆动力学参数</span>
               <span class="collapse-icon">{{ collapsedGroups.dynamicsParams ? '▶️' : '▼️' }}</span>
             </div>
             <div v-if="!collapsedGroups.dynamicsParams" class="menu-group-content">
@@ -42,10 +42,10 @@
             </div>
           </div>
           
-          <!-- 三维可视化部分 -->
+          <!-- 孪生数据可视化部分 -->
           <div class="menu-subgroup">
             <div class="menu-group-title collapsible" @click="toggleGroup('3dScene')">
-              <span>三维可视化</span>
+              <span>孪生数据可视化</span>
               <span class="collapse-icon">{{ collapsedGroups['3dScene'] ? '▶️' : '▼️' }}</span>
             </div>
             <div v-if="!collapsedGroups['3dScene']" class="menu-group-content">
@@ -55,7 +55,7 @@
                 @click="navigate('/wheel-rail-contact')"
               >
                 <div class="menu-icon">🔍</div>
-                <div class="menu-text">轮轨接触分析</div>
+                <div class="menu-text">轮轨力反演与分析</div>
               </div>
             </div>
           </div>

@@ -89,6 +89,40 @@ export const dataSimulator = {
     };
   },
 
+  // Generate speed data
+  generateSpeedData(mileage) {
+    const baseSpeed = 80; // Base speed in km/h
+    const maxSpeed = 120; // Maximum speed in km/h
+    const minSpeed = 60; // Minimum speed in km/h
+    
+    // Create realistic speed variations based on mileage
+    // Simulate acceleration and deceleration patterns
+    let speedVariation = 0;
+    
+    // Acceleration phase (0-3000m)
+    if (mileage < 3000) {
+      speedVariation = (maxSpeed - baseSpeed) * (mileage / 3000);
+    }
+    // Cruising phase (3000-7000m)
+    else if (mileage < 7000) {
+      speedVariation = (maxSpeed - baseSpeed) + Math.sin(mileage * 0.001) * 5;
+    }
+    // Deceleration phase (7000-10000m)
+    else {
+      speedVariation = (maxSpeed - baseSpeed) * (1 - (mileage - 7000) / 3000);
+    }
+    
+    // Add some random noise
+    const noise = (Math.random() - 0.5) * 3;
+    
+    const speed = baseSpeed + speedVariation + noise;
+    
+    return {
+      mileage,
+      speed: Math.max(minSpeed, Math.min(maxSpeed, speed))
+    };
+  },
+
   // Start simulating data with specified interval
   startSimulation(interval = 100, callbacks = {}) {
     let mileage = 0;
@@ -109,6 +143,11 @@ export const dataSimulator = {
       if (callbacks.onWheelRailForce) {
         const wheelRailForceData = this.generateWheelRailForceData(mileage);
         callbacks.onWheelRailForce(wheelRailForceData);
+      }
+      
+      if (callbacks.onSpeed) {
+        const speedData = this.generateSpeedData(mileage);
+        callbacks.onSpeed(speedData);
       }
       
       // Reset mileage after 10000 meters to create a loop

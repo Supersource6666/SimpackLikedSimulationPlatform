@@ -4,8 +4,8 @@
     <nav class="app-nav">
       <div class="nav-title">车辆数字孪生系统</div>
       <div class="nav-links">
-        <router-link to="/" class="nav-link">动力学参数</router-link>
-        <router-link to="/wheel-rail-contact" class="nav-link">三维可视化</router-link>
+        <router-link to="/" class="nav-link">车辆动力学参数</router-link>
+        <router-link to="/wheel-rail-contact" class="nav-link">孪生数据可视化</router-link>
         <router-link to="/" class="nav-link">数据处理与结果评估</router-link>
       </div>
     </nav>

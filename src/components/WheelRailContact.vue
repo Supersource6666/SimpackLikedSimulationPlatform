@@ -2,7 +2,7 @@
   <div class="wheel-rail-contact-container">
     <div class="viewer-container">
       <div class="controls-container">
-        <h3 class="section-title">轮轨接触分析</h3>
+        <h3 class="section-title">轮轨力反演与分析</h3>
         <div class="buttons-and-selector">
           <el-button @click="toggleAnimation">{{ isAnimating ? '停止运行' : '开始运行' }}</el-button>
           <el-button @click="resetAnimation">重置位置</el-button>
@@ -19,8 +19,7 @@
               <option value="axle4-position2">四轴右轮</option>
             </select>
           </div>
-          <el-button :class="{ 'active': showMinimap }" @click="toggleMinimap">运行轨迹</el-button>
-          <el-button :class="{ 'active': showMarshalling }" @click="toggleMarshalling">列车编组</el-button>
+          <el-button :class="{ 'active': showMarshalling }" @click="toggleMarshalling">车辆信息</el-button>
         </div>
       </div>
       <div ref="canvasContainer" class="canvas-container"></div>
@@ -39,7 +38,8 @@
           <div v-if="showWheelRailForceChart" class="chart-window draggable" 
                :style="{ left: wheelRailForcePosition.x + 'px', top: wheelRailForcePosition.y + 'px' }">
             <div class="chart-window-header draggable-header" 
-                 @mousedown="startDrag($event, 'wheelRailForce')">
+                 @mousedown="startDrag($event, 'wheelRailForce')"
+                 @touchstart="startDrag($event, 'wheelRailForce')">
               <h4>轮轨力</h4>
               <button class="close-button" @click="toggleWheelRailForceChart">×</button>
             </div>
@@ -48,7 +48,8 @@
           <div v-if="showWheelLoadReductionChart" class="chart-window draggable" 
                :style="{ left: wheelLoadReductionPosition.x + 'px', top: wheelLoadReductionPosition.y + 'px' }">
             <div class="chart-window-header draggable-header" 
-                 @mousedown="startDrag($event, 'wheelLoadReduction')">
+                 @mousedown="startDrag($event, 'wheelLoadReduction')"
+                 @touchstart="startDrag($event, 'wheelLoadReduction')">
               <h4>轮重减载率</h4>
               <button class="close-button" @click="toggleWheelLoadReductionChart">×</button>
             </div>
@@ -57,11 +58,22 @@
           <div v-if="showDerailmentCoefficientChart" class="chart-window draggable" 
                :style="{ left: derailmentCoefficientPosition.x + 'px', top: derailmentCoefficientPosition.y + 'px' }">
             <div class="chart-window-header draggable-header" 
-                 @mousedown="startDrag($event, 'derailmentCoefficient')">
+                 @mousedown="startDrag($event, 'derailmentCoefficient')"
+                 @touchstart="startDrag($event, 'derailmentCoefficient')">
               <h4>脱轨系数</h4>
               <button class="close-button" @click="toggleDerailmentCoefficientChart">×</button>
             </div>
             <div ref="derailmentCoefficientChartRef" class="chart"></div>
+          </div>
+          <div v-if="showSpeedChart" class="chart-window draggable" 
+               :style="{ left: speedPosition.x + 'px', top: speedPosition.y + 'px' }">
+            <div class="chart-window-header draggable-header" 
+                 @mousedown="startDrag($event, 'speed')"
+                 @touchstart="startDrag($event, 'speed')">
+              <h4>速度曲线</h4>
+              <button class="close-button" @click="toggleSpeedChart">×</button>
+            </div>
+            <div ref="speedChartRef" class="chart"></div>
           </div>
         </div>
       </div>
@@ -78,64 +90,24 @@
       <!-- 固定位置的编组视窗 -->
       <div v-if="showMarshalling" class="marshalling-fixed">
         <div class="window-header">
-          <h4>列车编组</h4>
+          <h4>车辆信息</h4>
           <button class="close-button" @click="toggleMarshalling">×</button>
         </div>
         <div class="marshalling-status">
           <div class="status-item">时间：{{ currentTime }}</div>
-          <div class="status-item">里程：{{ currentMileage.toFixed(2) }}km</div>
-          <div class="status-item">速度：{{ currentSpeed.toFixed(1) }}km/h</div>
-        </div>
-        <div ref="marshallingContainer" class="marshalling-container">
-          <div class="train-car motor">
-            <div class="car-number">1<br>动车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="0" width="50" height="80"></canvas>
+          <div class="buttons-row">
+            <div class="status-item">
+              <button class="status-button" @click="toggleMinimap">
+                运行轨迹：{{ currentMileage.toFixed(2) }}km
+              </button>
+            </div>
+            <div class="status-item">
+              <button class="status-button" @click="toggleSpeedChart">
+                速度：{{ currentSpeed.toFixed(1) }}km/h
+              </button>
             </div>
           </div>
-          <div class="train-car trailer">
-            <div class="car-number">2<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="1" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car trailer">
-            <div class="car-number">3<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="2" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car trailer">
-            <div class="car-number">4<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="3" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car trailer">
-            <div class="car-number">5<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="4" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car trailer">
-            <div class="car-number">6<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="5" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car trailer">
-            <div class="car-number">7<br>拖车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="6" width="50" height="80"></canvas>
-            </div>
-          </div>
-          <div class="train-car motor">
-            <div class="car-number">8<br>动车</div>
-            <div class="car-model">
-              <canvas class="model-canvas" data-car-index="7" width="50" height="80"></canvas>
-            </div>
-          </div>
-        </div>
+        </div>      
       </div>
     </div>
   </div>
@@ -169,17 +141,13 @@ let bogie = null
 let secondBogie = null
 let contactArrows = [] // 存储轮轨接触点箭头
 
-// 编组场景相关变量
-let marshallingScene = null
-let marshallingCamera = null
-let marshallingRenderer = null
-let marshallingAnimationId = null
-let marshallingModels = [] // 存储加载的编组模型
+
 
 // 图表引用
 const wheelLoadReductionChartRef = ref(null)
 const derailmentCoefficientChartRef = ref(null)
 const wheelRailForceChartRef = ref(null)
+const speedChartRef = ref(null)
 
 // 图表显示状态
 const showWheelRailForceChart = ref(true)
@@ -190,6 +158,7 @@ const showDerailmentCoefficientChart = ref(true)
 const wheelRailForcePosition = ref({ x: 0, y: 0 })
 const wheelLoadReductionPosition = ref({ x: 300, y: 0 })
 const derailmentCoefficientPosition = ref({ x: 600, y: 0 })
+const speedPosition = ref({ x: 0, y: 300 })
 
 // Drag functionality
 let isDragging = false
@@ -204,10 +173,30 @@ const windowWidth = 280 // Fixed width of chart windows
 const windowHeight = 190 // Fixed height of chart windows
 
 function startDrag(event, windowType) {
+  // Check if the event target is a close button
+  if (event.target.classList.contains('close-button')) {
+    return // Don't start drag if clicking the close button
+  }
+  
+  // Handle both mouse and touch events
+  // For touch events, check if any touch target is a close button
+  if (event.type.includes('touch') && event.touches) {
+    for (let i = 0; i < event.touches.length; i++) {
+      if (event.touches[i].target.classList.contains('close-button')) {
+        return // Don't start drag if touching the close button
+      }
+    }
+  }
+  
   isDragging = true
   activeWindow = windowType
-  dragStartX = event.clientX
-  dragStartY = event.clientY
+  
+  // Handle both mouse and touch events
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+  
+  dragStartX = clientX
+  dragStartY = clientY
   
   // Get current position of the active window
   switch (windowType) {
@@ -223,6 +212,10 @@ function startDrag(event, windowType) {
       windowStartX = derailmentCoefficientPosition.value.x
       windowStartY = derailmentCoefficientPosition.value.y
       break
+    case 'speed':
+      windowStartX = speedPosition.value.x
+      windowStartY = speedPosition.value.y
+      break
   }
   
   // Get container dimensions for boundary checking
@@ -232,31 +225,38 @@ function startDrag(event, windowType) {
     containerHeight = container.clientHeight
   } else {
     // Fallback dimensions if container not found
-    containerWidth = window.innerWidth - 300 // Account for sidebar
-    containerHeight = window.innerHeight - 200 // Account for header
+    containerWidth = window.innerWidth // Use full window width
+    containerHeight = window.innerHeight - 100 // Account for header
   }
   
-  // Add event listeners for mouse move and mouse up
+  // Add event listeners for mouse and touch
   document.addEventListener('mousemove', onDrag)
   document.addEventListener('mouseup', stopDrag)
+  document.addEventListener('touchmove', onDrag, { passive: false })
+  document.addEventListener('touchend', stopDrag)
   
-  // Prevent default to avoid text selection
+  // Prevent default to avoid text selection and scrolling
   event.preventDefault()
 }
 
 function onDrag(event) {
   if (!isDragging || !activeWindow) return
   
-  const deltaX = event.clientX - dragStartX
-  const deltaY = event.clientY - dragStartY
+  // Handle both mouse and touch events
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+  
+  const deltaX = clientX - dragStartX
+  const deltaY = clientY - dragStartY
   
   // Calculate new position with boundary restrictions
   let newX = windowStartX + deltaX
   let newY = windowStartY + deltaY
   
   // Clamp position to keep window within reasonable boundaries
-  newX = Math.max(0, Math.min(newX, containerWidth - windowWidth))
-  newY = Math.max(0, Math.min(newY, containerHeight - windowHeight))
+  // Allow windows to move within 10px of the right edge
+  newX = Math.max(0, Math.min(newX, containerWidth - 10))
+  newY = Math.max(0, Math.min(newY, containerHeight - 10))
   
   // Update position based on window type
   switch (activeWindow) {
@@ -272,6 +272,15 @@ function onDrag(event) {
       derailmentCoefficientPosition.value.x = newX
       derailmentCoefficientPosition.value.y = newY
       break
+    case 'speed':
+      speedPosition.value.x = newX
+      speedPosition.value.y = newY
+      break
+  }
+  
+  // Prevent default for touch events to avoid scrolling
+  if (event.type.includes('touch')) {
+    event.preventDefault()
   }
 }
 
@@ -279,14 +288,17 @@ function stopDrag() {
   isDragging = false
   activeWindow = null
   
-  // Remove event listeners
+  // Remove event listeners for mouse and touch
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('mouseup', stopDrag)
+  document.removeEventListener('touchmove', onDrag)
+  document.removeEventListener('touchend', stopDrag)
 }
 
 // 视窗显示状态
-const showMinimap = ref(true)
+const showMinimap = ref(false)
 const showMarshalling = ref(true)
+const showSpeedChart = ref(false)
 
 // 状态信息
 const currentTime = ref('')
@@ -482,6 +494,7 @@ function switchView(viewType) {
 let wheelLoadReductionChart = null
 let derailmentCoefficientChart = null
 let wheelRailForceChart = null
+let speedChart = null
 
 // 数据模拟相关
 let simulationInterval = null
@@ -504,6 +517,12 @@ const wheelRailForceData = reactive({
   verticalForces: [],
   lateralForces: [],
   longitudinalForces: []
+})
+
+// 速度数据
+const speedData = reactive({
+  mileages: [],
+  speeds: []
 })
 
 // 轨道元素管理
@@ -625,40 +644,9 @@ function initScene() {
       setTrackPath(baseTrackPath)
     }
   }
-  
-  // 初始化编组视窗
-  initMarshallingView()
 }
 
-// 初始化编组视窗
-function initMarshallingView() {
-  console.log('尝试初始化编组视窗...')
-  
-  // 直接通过DOM查询获取编组容器
-  const container = document.querySelector('.marshalling-container')
-  if (!container) {
-    console.error('编组容器未找到！')
-    return
-  }
-  
-  console.log('找到编组容器:', container)
-  
-  // 清空现有内容
-  container.innerHTML = ''
-  
-  // 创建一个单一的画布，用于显示整个编组
-  const canvas = document.createElement('canvas')
-  canvas.width = 300
-  canvas.height = 180
-  canvas.style.width = '100%'
-  canvas.style.height = '100%'
-  container.appendChild(canvas)
-  
-  // 初始化整个编组场景
-  initMarshallingScene(canvas)
-  
-  console.log('编组视窗初始化完成')
-}
+
 
 // 初始化编组场景
 function initMarshallingScene(canvas) {
@@ -688,21 +676,7 @@ function initMarshallingScene(canvas) {
   const pointLight = new THREE.PointLight(0xffffff, 0.5)
   pointLight.position.set(0, 1, 1)
   scene.add(pointLight)
-  
-  // 列车编组配置：动车-拖车-拖车-拖车---动车
-  const trainConfig = [
-    { type: 'motor', name: '动车', modelPath: '/models_3d/gao.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
-    { type: 'motor', name: '动车', modelPath: '/models_3d/gao.glb' }
-  ]
-  
-  // 加载所有模型
-  let loadedModels = 0
+
   
   trainConfig.forEach((carConfig, index) => {
     const loader = new GLTFLoader()
@@ -778,13 +752,7 @@ function initMarshallingScene(canvas) {
 
 
 
-// 渲染编组场景
-function animateMarshallingScene() {
-  if (!marshallingRenderer || !marshallingScene || !marshallingCamera) return
-  
-  marshallingRenderer.render(marshallingScene, marshallingCamera)
-  marshallingAnimationId = requestAnimationFrame(animateMarshallingScene)
-}
+
 
 // 加载模型到画布
 function loadModelToCanvas(canvas, carConfig) {
@@ -2397,7 +2365,8 @@ function startAnimation() {
     simulationInterval = dataSimulator.startSimulation(100, {
       onWheelLoadReduction: handleWheelLoadReductionMessage,
       onDerailmentCoefficient: handleDerailmentCoefficientMessage,
-      onWheelRailForce: handleWheelRailForceMessage
+      onWheelRailForce: handleWheelRailForceMessage,
+      onSpeed: handleSpeedMessage
     })
   }
 }
@@ -2448,10 +2417,14 @@ function resetAnimation() {
   wheelRailForceData.lateralForces = []
   wheelRailForceData.longitudinalForces = []
   
+  speedData.mileages = []
+  speedData.speeds = []
+  
   // 更新图表
   updateWheelLoadReductionChart()
   updateDerailmentCoefficientChart()
   updateWheelRailForceChart()
+  updateSpeedChart()
 }
 
 // 切换轮轨力图表显示
@@ -2487,15 +2460,15 @@ function toggleMinimap() {
   }
 }
 
-// 切换列车编组视窗显示
+// 切换速度图表显示
+function toggleSpeedChart() {
+  showSpeedChart.value = !showSpeedChart.value
+}
+
+// 切换车辆信息视窗显示
 function toggleMarshalling() {
   showMarshalling.value = !showMarshalling.value
-  // 如果重新打开编组视窗，重新初始化
-  if (showMarshalling.value) {
-    setTimeout(() => {
-      initMarshallingView()
-    }, 0)
-  }
+  // 如果重新打开编组视窗，不需要重新初始化
 }
 
 // 设置关注轮轴位置
@@ -2812,12 +2785,9 @@ onMounted(() => {
   initWheelLoadReductionChart()
   initDerailmentCoefficientChart()
   initWheelRailForceChart()
+  initSpeedChart()
   
-  // 初始化编组视窗（延迟执行，确保DOM完全渲染）
-  setTimeout(() => {
-    console.log('延迟初始化编组视窗...')
-    initMarshallingView()
-  }, 500)
+  
 })
 
 // 监听图表显示状态变化，重新初始化图表
@@ -2850,6 +2820,15 @@ watch(showDerailmentCoefficientChart, (newVal) => {
       if (derailmentCoefficientData.mileages.length > 0) {
         updateDerailmentCoefficientChart()
       }
+    }, 0)
+  }
+})
+
+// 监听速度图表显示状态变化，重新初始化图表
+watch(showSpeedChart, (newVal) => {
+  if (newVal) {
+    setTimeout(() => {
+      initSpeedChart()
     }, 0)
   }
 })
@@ -3554,6 +3533,129 @@ const handleWheelRailForceMessage = (dataPoint) => {
   
   updateWheelRailForceChart();
 }
+
+// 处理速度数据消息
+const handleSpeedMessage = (dataPoint) => {
+  // 直接使用模拟器生成的数据格式
+  speedData.mileages.push(dataPoint.mileage);
+  speedData.speeds.push(dataPoint.speed);
+  
+  // 保持数据点在合理范围内
+  if (speedData.mileages.length > 100) {
+    speedData.mileages.shift();
+    speedData.speeds.shift();
+  }
+  
+  // 更新当前速度
+  currentSpeed.value = dataPoint.speed;
+  
+  // 更新图表
+  updateSpeedChart();
+}
+
+// 初始化速度曲线
+const initSpeedChart = () => {
+  if (!speedChartRef.value) return
+  
+  speedChart = echarts.init(speedChartRef.value)
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+        label: {
+          backgroundColor: '#6a7985'
+        }
+      }
+    },
+    legend: {
+      data: ['速度'],
+      textStyle: {
+        color: '#fff'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: [
+      {
+        type: 'category',
+        boundaryGap: false,
+        data: speedData.mileages,
+        axisLabel: {
+          color: '#fff'
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#444'
+          }
+        }
+      }
+    ],
+    yAxis: [
+      {
+        type: 'value',
+        name: '速度 (km/h)',
+        nameTextStyle: {
+          color: '#fff'
+        },
+        axisLabel: {
+          color: '#fff'
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#444'
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          }
+        }
+      }
+    ],
+    series: [
+      {
+        name: '速度',
+        type: 'line',
+        stack: 'Total',
+        areaStyle: {
+          opacity: 0.3
+        },
+        emphasis: {
+          focus: 'series'
+        },
+        data: speedData.speeds,
+        lineStyle: {
+          width: 2,
+          color: '#ff6b00'
+        }
+      }
+    ]
+  }
+  
+  speedChart.setOption(option)
+}
+
+// 更新速度曲线
+const updateSpeedChart = () => {
+  if (!speedChart) return
+  
+  speedChart.setOption({
+    xAxis: {
+      data: speedData.mileages
+    },
+    series: [
+      {
+        data: speedData.speeds
+      }
+    ]
+  })
+}
 </script>
 
 <style scoped>
@@ -3583,8 +3685,8 @@ const handleWheelRailForceMessage = (dataPoint) => {
   position: absolute;
   top: 80px;
   left: 270px;
-  right: 500px;
-  bottom: 20px;
+  right: 400px;
+  bottom: 250px;
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -3598,10 +3700,11 @@ const handleWheelRailForceMessage = (dataPoint) => {
   justify-content: flex-start;
   margin-bottom: 5px;
   pointer-events: auto;
+  flex-wrap: nowrap;
 }
 
 .chart-controls .speed-button {
-  flex: 1;
+  width: 120px;
   max-width: 120px;
 }
 
@@ -3655,18 +3758,26 @@ const handleWheelRailForceMessage = (dataPoint) => {
   color: #fff;
   font-size: 18px;
   cursor: pointer;
-  padding: 0;
-  width: 20px;
-  height: 20px;
+  padding: 8px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   transition: background-color 0.2s ease;
+  z-index: 1001;
+  position: relative;
 }
 
 .close-button:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure close buttons work properly on touch devices */
+.close-button {
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .chart {
@@ -3691,6 +3802,7 @@ const handleWheelRailForceMessage = (dataPoint) => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .buttons-and-selector {
@@ -3698,6 +3810,7 @@ const handleWheelRailForceMessage = (dataPoint) => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .buttons-and-selector .el-button {
@@ -3762,6 +3875,8 @@ const handleWheelRailForceMessage = (dataPoint) => {
   font-size: 0.9rem;
   transition: background-color 0.3s;
   width: 120px;
+  min-width: 120px;
+  max-width: 120px;
 }
 
 .speed-button:hover {
@@ -3808,15 +3923,16 @@ const handleWheelRailForceMessage = (dataPoint) => {
 
 .minimap-fixed {
   position: absolute;
-  top: 80px;
+  top: 350px;
   left: 20px;
-  width: 230px;
-  height: 254px;
-  background-color: rgba(10, 25, 47, 0.8);
+  width: 280px;
+  max-width: calc(100% - 40px);
+  height: 190px;
+  background-color: rgba(0, 28, 78, 0.7);
   border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  z-index: 101;
   border: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: auto;
 }
@@ -3825,7 +3941,9 @@ const handleWheelRailForceMessage = (dataPoint) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  cursor: move;
+  user-select: none;
 }
 
 .minimap-fixed h4 {
@@ -3838,7 +3956,7 @@ const handleWheelRailForceMessage = (dataPoint) => {
 
 .minimap-fixed canvas {
   width: 100%;
-  height: 200px;
+  height: calc(100% - 32px);
   border-radius: 4px;
   background-color: #b2d1fd;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -3848,7 +3966,7 @@ const handleWheelRailForceMessage = (dataPoint) => {
 .marshalling-fixed {
   position: absolute;
   top: 80px;
-  right: 180px;
+  left: 20px;
   background-color: rgba(10, 25, 47, 0.8);
   border-radius: 8px;
   padding: 15px;
@@ -3856,6 +3974,7 @@ const handleWheelRailForceMessage = (dataPoint) => {
   z-index: 1000;
   border: 1px solid rgba(255, 255, 255, 0.1);
   width: 320px;
+  max-width: calc(100% - 40px);
   height: 254px;
   display: block !important;
   pointer-events: auto;
@@ -3878,13 +3997,45 @@ const handleWheelRailForceMessage = (dataPoint) => {
 
 .marshalling-status {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
   font-size: 12px;
   color: #fff;
   margin-bottom: 10px;
   padding: 5px;
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
+}
+
+.marshalling-status .status-item:first-child {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.marshalling-status .buttons-row {
+  display: flex;
+  gap: 8px;
+}
+
+.status-button {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: rgba(0, 138, 250, 0.8);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  text-align: left;
+}
+
+.status-button:hover {
+  background-color: rgba(0, 119, 217, 0.9);
+}
+
+.status-button:active {
+  background-color: rgba(0, 99, 184, 1);
 }
 
 .status-item {
@@ -3899,6 +4050,87 @@ const handleWheelRailForceMessage = (dataPoint) => {
   display: flex;
   align-items: center;
   justify-content: center; /* 居中显示内容 */
+}
+
+.marshalling-status-simple {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.marshalling-status-simple .status-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.marshalling-status-simple .status-item {
+  color: #e0e0e0;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .controls-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .buttons-and-selector {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .minimap-fixed {
+    top: 140px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: calc(100% - 20px);
+  }
+  
+  .marshalling-fixed {
+    top: 420px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: calc(100% - 20px);
+  }
+  
+  .chart-windows {
+    left: 10px;
+    right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .buttons-and-selector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .view-selector {
+    width: 100%;
+  }
+  
+  .view-select-dropdown {
+    width: 100%;
+  }
+  
+  .minimap-fixed,
+  .marshalling-fixed {
+    width: calc(100% - 20px);
+  }
 }
 
 

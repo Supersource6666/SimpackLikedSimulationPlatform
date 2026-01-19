@@ -861,7 +861,7 @@ const handleResize = () => {
   frameAccelerationChart?.resize();
 };
 
-// 跳转到动力学参数界面
+// 跳转到车辆动力学参数界面
 function goToParams() {
   stopAnimation()
   router.push('/')

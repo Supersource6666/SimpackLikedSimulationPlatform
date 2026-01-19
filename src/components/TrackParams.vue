@@ -102,7 +102,7 @@
     <!-- 纵断面参数内容 -->
     <div v-if="activeTab === 'vertical'" class="tab-content">
       <div class="vertical-section">
-        <h3>纵断面动力学参数</h3>
+        <h3>纵断面车辆动力学参数</h3>
         <div class="vertical-params">
           <div class="vertical-params-group">
             <div class="param-item">
@@ -1103,7 +1103,7 @@ defineExpose({
   font-weight: bold;
 }
 
-/* 纵断面动力学参数样式 */
+/* 纵断面车辆动力学参数样式 */
 .vertical-section {
   background-color: #ffffff;
   border-radius: 8px;

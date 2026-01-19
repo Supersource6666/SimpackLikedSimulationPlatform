@@ -58,7 +58,7 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
         
         // 设置模型初始状态，校准模型轴向
         // 假设模型长轴方向沿Z轴，这里进行校准
-        trainModel.rotation.set(0, 0, 0) // 动力学参数初始旋转
+        trainModel.rotation.set(0, 0, 0) // 车辆动力学参数初始旋转
         // 添加模型轴向校准，确保模型长轴与预期方向一致
         // 对于GLB模型，可能需要根据模型自身的朝向进行调整
         // 这里假设模型需要绕Y轴旋转90度才能使长轴与X轴一致

@@ -19,11 +19,11 @@
         <!-- 新增内容占位符 -->
         <div v-if="activeTab === 'trainVisualization'" class="placeholder-content">
           <h2>列车实时运行</h2>
-          <p>此处将显示列车编组的三维可视化内容</p>
+          <p>此处将显示车辆信息的孪生数据可视化内容</p>
         </div>
         <div v-if="activeTab === 'wheelRailAnalysis'" class="placeholder-content">
-          <h2>轮轨接触分析</h2>
-          <p>此处将显示轮轨接触分析的三维可视化内容</p>
+          <h2>轮轨力反演与分析</h2>
+          <p>此处将显示轮轨力反演与分析的孪生数据可视化内容</p>
         </div>
         <DataAnalysis 
           v-if="activeTab === 'dataAnalysis'" 
@@ -50,7 +50,7 @@
       <!-- 提交按钮 -->
       <div class="submit-container">
         <button class="submit-btn" @click="saveAllParams" v-if="['vehicle', 'track', 'operation'].includes(activeTab)">
-          保存参数并进入轮轨接触分析
+          保存参数并进入轮轨力反演与分析
         </button>
       </div>
     </div>
@@ -83,7 +83,7 @@ watch(() => route.query.tab, (newTab) => {
   }
 });
 
-// 保存所有参数并导航到轮轨接触分析
+// 保存所有参数并导航到轮轨力反演与分析
 const saveAllParams = async () => {
   try {
     console.log('开始保存参数...');
@@ -141,7 +141,7 @@ const saveAllParams = async () => {
       }
     } 
     else if (activeTab.value === 'operation') {
-      // 运行参数页面：保存运行参数，然后跳转到列车编组展示
+      // 运行参数页面：保存运行参数，然后跳转到车辆信息展示
       if (operationParamsRef.value?.getOperationParams) {
         const operationParams = operationParamsRef.value.getOperationParams();
         
@@ -154,8 +154,8 @@ const saveAllParams = async () => {
         trackStore.setOperationParams(operationParams);
         console.log('运行参数保存成功');
         
-        // 导航到轮轨接触分析视图
-        console.log('所有参数保存成功，导航到轮轨接触分析视图...');
+        // 导航到轮轨力反演与分析视图
+        console.log('所有参数保存成功，导航到轮轨力反演与分析视图...');
         router.push('/wheel-rail-contact');
       }
     }
@@ -167,7 +167,7 @@ const saveAllParams = async () => {
 
 // 组件挂载
 onMounted(() => {
-  console.log('动力学参数页面已加载');
+  console.log('车辆动力学参数页面已加载');
 });
 </script>
 
