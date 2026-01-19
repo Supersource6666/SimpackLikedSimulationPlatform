@@ -27,9 +27,8 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
   for (let i = 0; i < trainCount; i++) {
     // 决定使用哪个模型
     const isFirst = i === 0
-    const isLast = i === trainCount - 1 // 不管车辆数量多少，最后一节车都使用motor_car_transparent.glb
+    const isLast = i >= 5 // 第6-8节也使用动车模型
     const modelPath = (isFirst || isLast) 
-      // ? '/models_3d/motor_car_transparent.glb' 
       ? '/models_3d/gao.glb' 
       : '/models_3d/tuo.glb'
     
@@ -65,15 +64,15 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
         // 这里假设模型需要绕Y轴旋转90度才能使长轴与X轴一致
         
         // 根据车辆位置设置朝向
-        if (carIsFirst) {
+        if (isFirst) {
           // 车头模型朝向 - 绕自身Y轴旋转180度
           trainModel.rotation.y = Math.PI
-        } else if (carIsLast) {
+        } else if (isLast) {
           // 车尾模型朝向（与车头相反）
-          trainModel.rotation.y = -Math.PI / 2
+          trainModel.rotation.y = 0
         } else {
           // 中间车辆朝向与车头一致
-          trainModel.rotation.y = Math.PI / 2
+          trainModel.rotation.y = Math.PI
         }
         
         // 计算基础位置
@@ -169,9 +168,11 @@ export function createTrain(scene, trackPathRef, trackLengthRef) {
           // 车头模型朝向 - 绕自身Y轴旋转180度
           fallbackTrain.rotation.y = Math.PI
         } else if (carIsLast) {
-          fallbackTrain.rotation.y = -Math.PI / 2
+          // 车尾模型朝向（与车头相反）
+          fallbackTrain.rotation.y = 0
         } else {
-          fallbackTrain.rotation.y = Math.PI / 2
+          // 中间车辆朝向与车头一致
+          fallbackTrain.rotation.y = Math.PI
         }
         
         scene.add(fallbackTrain)

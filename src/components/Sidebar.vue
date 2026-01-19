@@ -1,10 +1,10 @@
 <template>
   <div class="sidebar">
     <div class="menu-items">
-      <!-- 项目功能部分 -->
+      <!-- 子系统部分 -->
       <div class="menu-group">
         <div class="menu-group-title collapsible" @click="toggleGroup('projectFunctions')">
-          <span>项目功能</span>
+          <span>子系统</span>
           <span class="collapse-icon">{{ collapsedGroups.projectFunctions ? '▶️' : '▼️' }}</span>
         </div>
         <div v-if="!collapsedGroups.projectFunctions" class="menu-group-content">
@@ -42,10 +42,10 @@
             </div>
           </div>
           
-          <!-- 三维场景展示部分 -->
+          <!-- 三维可视化部分 -->
           <div class="menu-subgroup">
             <div class="menu-group-title collapsible" @click="toggleGroup('3dScene')">
-              <span>三维场景展示</span>
+              <span>三维可视化</span>
               <span class="collapse-icon">{{ collapsedGroups['3dScene'] ? '▶️' : '▼️' }}</span>
             </div>
             <div v-if="!collapsedGroups['3dScene']" class="menu-group-content">
@@ -60,10 +60,10 @@
             </div>
           </div>
           
-          <!-- 动力学安全评估部分 -->
+          <!-- 数据处理与结果评估部分 -->
           <div class="menu-subgroup">
             <div class="menu-group-title collapsible" @click="toggleGroup('safetyAssessment')">
-              <span>动力学安全评估</span>
+              <span>数据处理与结果评估</span>
               <span class="collapse-icon">{{ collapsedGroups.safetyAssessment ? '▶️' : '▼️' }}</span>
             </div>
             <div v-if="!collapsedGroups.safetyAssessment" class="menu-group-content">
@@ -73,7 +73,7 @@
                 @click="navigate('/', 'dataAnalysis')"
               >
                 <div class="menu-icon">📊</div>
-                <div class="menu-text">数据分析</div>
+                <div class="menu-text">数据处理</div>
               </div>
               <div 
                 class="menu-item sub-menu-item" 
@@ -81,17 +81,17 @@
                 @click="navigate('/', 'evaluationResults')"
               >
                 <div class="menu-icon">✅</div>
-                <div class="menu-text">评估结果</div>
+                <div class="menu-text">结果评估</div>
               </div>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- 系统功能部分 -->
+      <!-- 系统简介部分 -->
       <div class="menu-group">
         <div class="menu-group-title collapsible" @click="toggleGroup('systemFunctions')">
-          <span>系统功能</span>
+          <span>系统简介</span>
           <span class="collapse-icon">{{ collapsedGroups.systemFunctions ? '▶️' : '▼️' }}</span>
         </div>
         <div v-if="!collapsedGroups.systemFunctions" class="menu-group-content">

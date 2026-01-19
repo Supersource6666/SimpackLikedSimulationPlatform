@@ -1,6 +1,6 @@
 <template>
   <div class="data-analysis-container">
-    <h2 class="page-title">数据分析</h2>
+    <h2 class="page-title">数据处理</h2>
     
     <!-- 图表容器 -->
     <div class="chart-container">

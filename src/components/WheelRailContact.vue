@@ -19,6 +19,8 @@
               <option value="axle4-position2">四轴右轮</option>
             </select>
           </div>
+          <el-button :class="{ 'active': showMinimap }" @click="toggleMinimap">运行轨迹</el-button>
+          <el-button :class="{ 'active': showMarshalling }" @click="toggleMarshalling">列车编组</el-button>
         </div>
       </div>
       <div ref="canvasContainer" class="canvas-container"></div>
@@ -34,22 +36,28 @@
         
         <!-- 图表窗口容器 -->
         <div class="chart-window-container">
-          <div v-if="showWheelRailForceChart" class="chart-window">
-            <div class="chart-window-header">
+          <div v-if="showWheelRailForceChart" class="chart-window draggable" 
+               :style="{ left: wheelRailForcePosition.x + 'px', top: wheelRailForcePosition.y + 'px' }">
+            <div class="chart-window-header draggable-header" 
+                 @mousedown="startDrag($event, 'wheelRailForce')">
               <h4>轮轨力</h4>
               <button class="close-button" @click="toggleWheelRailForceChart">×</button>
             </div>
             <div ref="wheelRailForceChartRef" class="chart"></div>
           </div>
-          <div v-if="showWheelLoadReductionChart" class="chart-window">
-            <div class="chart-window-header">
+          <div v-if="showWheelLoadReductionChart" class="chart-window draggable" 
+               :style="{ left: wheelLoadReductionPosition.x + 'px', top: wheelLoadReductionPosition.y + 'px' }">
+            <div class="chart-window-header draggable-header" 
+                 @mousedown="startDrag($event, 'wheelLoadReduction')">
               <h4>轮重减载率</h4>
               <button class="close-button" @click="toggleWheelLoadReductionChart">×</button>
             </div>
             <div ref="wheelLoadReductionChartRef" class="chart"></div>
           </div>
-          <div v-if="showDerailmentCoefficientChart" class="chart-window">
-            <div class="chart-window-header">
+          <div v-if="showDerailmentCoefficientChart" class="chart-window draggable" 
+               :style="{ left: derailmentCoefficientPosition.x + 'px', top: derailmentCoefficientPosition.y + 'px' }">
+            <div class="chart-window-header draggable-header" 
+                 @mousedown="startDrag($event, 'derailmentCoefficient')">
               <h4>脱轨系数</h4>
               <button class="close-button" @click="toggleDerailmentCoefficientChart">×</button>
             </div>
@@ -59,9 +67,75 @@
       </div>
       
       <!-- 固定位置的小地图 -->
-      <div class="minimap-fixed">
-        <h4>运行轨迹</h4>
+      <div v-if="showMinimap" class="minimap-fixed">
+        <div class="window-header">
+          <h4>运行轨迹</h4>
+          <button class="close-button" @click="toggleMinimap">×</button>
+        </div>
         <canvas id="minimapCanvas" width="200" height="200"></canvas>
+      </div>
+      
+      <!-- 固定位置的编组视窗 -->
+      <div v-if="showMarshalling" class="marshalling-fixed">
+        <div class="window-header">
+          <h4>列车编组</h4>
+          <button class="close-button" @click="toggleMarshalling">×</button>
+        </div>
+        <div class="marshalling-status">
+          <div class="status-item">时间：{{ currentTime }}</div>
+          <div class="status-item">里程：{{ currentMileage.toFixed(2) }}km</div>
+          <div class="status-item">速度：{{ currentSpeed.toFixed(1) }}km/h</div>
+        </div>
+        <div ref="marshallingContainer" class="marshalling-container">
+          <div class="train-car motor">
+            <div class="car-number">1<br>动车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="0" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">2<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="1" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">3<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="2" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">4<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="3" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">5<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="4" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">6<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="5" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car trailer">
+            <div class="car-number">7<br>拖车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="6" width="50" height="80"></canvas>
+            </div>
+          </div>
+          <div class="train-car motor">
+            <div class="car-number">8<br>动车</div>
+            <div class="car-model">
+              <canvas class="model-canvas" data-car-index="7" width="50" height="80"></canvas>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -78,9 +152,10 @@ import { initMinimap, updateMinimap, setTrackPath } from '../utils/minimapManage
 import { createTrack as createManagerTrack, updateRailSegments, getTrackState } from '../utils/trackManager'
 import { createTrain, updateTrainPosition, getTrains, setTrackInfo } from '../utils/trainManager'
 import * as echarts from 'echarts'
-import { webSocketAPI } from '../utils/api'
+import { dataSimulator } from '../utils/dataSimulator'
 
 const canvasContainer = ref(null)
+const marshallingContainer = ref(null)
 let scene, camera, renderer, controls
 let trackPath, trackLength
 let baseTrackPath, leftTrackPath, rightTrackPath
@@ -94,6 +169,13 @@ let bogie = null
 let secondBogie = null
 let contactArrows = [] // 存储轮轨接触点箭头
 
+// 编组场景相关变量
+let marshallingScene = null
+let marshallingCamera = null
+let marshallingRenderer = null
+let marshallingAnimationId = null
+let marshallingModels = [] // 存储加载的编组模型
+
 // 图表引用
 const wheelLoadReductionChartRef = ref(null)
 const derailmentCoefficientChartRef = ref(null)
@@ -104,8 +186,144 @@ const showWheelRailForceChart = ref(true)
 const showWheelLoadReductionChart = ref(true)
 const showDerailmentCoefficientChart = ref(true)
 
+// Chart window positions
+const wheelRailForcePosition = ref({ x: 0, y: 0 })
+const wheelLoadReductionPosition = ref({ x: 300, y: 0 })
+const derailmentCoefficientPosition = ref({ x: 600, y: 0 })
+
+// Drag functionality
+let isDragging = false
+let activeWindow = null
+let dragStartX = 0
+let dragStartY = 0
+let windowStartX = 0
+let windowStartY = 0
+let containerWidth = 0
+let containerHeight = 0
+const windowWidth = 280 // Fixed width of chart windows
+const windowHeight = 190 // Fixed height of chart windows
+
+function startDrag(event, windowType) {
+  isDragging = true
+  activeWindow = windowType
+  dragStartX = event.clientX
+  dragStartY = event.clientY
+  
+  // Get current position of the active window
+  switch (windowType) {
+    case 'wheelRailForce':
+      windowStartX = wheelRailForcePosition.value.x
+      windowStartY = wheelRailForcePosition.value.y
+      break
+    case 'wheelLoadReduction':
+      windowStartX = wheelLoadReductionPosition.value.x
+      windowStartY = wheelLoadReductionPosition.value.y
+      break
+    case 'derailmentCoefficient':
+      windowStartX = derailmentCoefficientPosition.value.x
+      windowStartY = derailmentCoefficientPosition.value.y
+      break
+  }
+  
+  // Get container dimensions for boundary checking
+  const container = document.querySelector('.chart-window-container')
+  if (container) {
+    containerWidth = container.clientWidth
+    containerHeight = container.clientHeight
+  } else {
+    // Fallback dimensions if container not found
+    containerWidth = window.innerWidth - 300 // Account for sidebar
+    containerHeight = window.innerHeight - 200 // Account for header
+  }
+  
+  // Add event listeners for mouse move and mouse up
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+  
+  // Prevent default to avoid text selection
+  event.preventDefault()
+}
+
+function onDrag(event) {
+  if (!isDragging || !activeWindow) return
+  
+  const deltaX = event.clientX - dragStartX
+  const deltaY = event.clientY - dragStartY
+  
+  // Calculate new position with boundary restrictions
+  let newX = windowStartX + deltaX
+  let newY = windowStartY + deltaY
+  
+  // Clamp position to keep window within reasonable boundaries
+  newX = Math.max(0, Math.min(newX, containerWidth - windowWidth))
+  newY = Math.max(0, Math.min(newY, containerHeight - windowHeight))
+  
+  // Update position based on window type
+  switch (activeWindow) {
+    case 'wheelRailForce':
+      wheelRailForcePosition.value.x = newX
+      wheelRailForcePosition.value.y = newY
+      break
+    case 'wheelLoadReduction':
+      wheelLoadReductionPosition.value.x = newX
+      wheelLoadReductionPosition.value.y = newY
+      break
+    case 'derailmentCoefficient':
+      derailmentCoefficientPosition.value.x = newX
+      derailmentCoefficientPosition.value.y = newY
+      break
+  }
+}
+
+function stopDrag() {
+  isDragging = false
+  activeWindow = null
+  
+  // Remove event listeners
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
+// 视窗显示状态
+const showMinimap = ref(true)
+const showMarshalling = ref(true)
+
+// 状态信息
+const currentTime = ref('')
+const currentMileage = ref(0)
+const currentSpeed = ref(0)
+
+// 更新当前时间
+function updateCurrentTime() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  currentTime.value = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+// 更新里程和速度
+function updateTrainStatus() {
+  if (!baseTrackPath) return
+  
+  // 根据当前进度计算里程
+  const trackLength = baseTrackPath.getLength()
+  const mileage = (progress.value * trackLength) / 1000 // 转换为公里
+  currentMileage.value = mileage
+  
+  // 模拟速度（根据动画状态）
+  if (isAnimating.value) {
+    currentSpeed.value = 300 // 假设运行速度为300km/h
+  } else {
+    currentSpeed.value = 0 // 静止时速度为0
+  }
+}
+
 // 视角选择
-const currentView = ref('main')
+const currentView = ref('axle2-position1')
 
 // 监听视角变化
 watch(currentView, (newView) => {
@@ -265,10 +483,8 @@ let wheelLoadReductionChart = null
 let derailmentCoefficientChart = null
 let wheelRailForceChart = null
 
-// WebSocket连接
-let wheelLoadReductionWS = null
-let derailmentCoefficientWS = null
-let wheelRailForceWS = null
+// 数据模拟相关
+let simulationInterval = null
 
 // 图表数据存储
 const wheelLoadReductionData = reactive({
@@ -299,6 +515,13 @@ let trackElements = {
   grids: []
 }
 
+// 轨道元素池，用于重用元素，减少内存开销
+let trackElementPool = {
+  bases: [],
+  sleepers: [],
+  rails: []
+}
+
 // 共享几何体和材质
 let sharedGeometries = {
   base: null,
@@ -320,6 +543,11 @@ let cameraTargetPosition = new THREE.Vector3(-3, 8, -10) // 初始化为与相�
 let cameraTargetLookAt = new THREE.Vector3(0, 2, 0) // 初始化为默认目标点
 let controlsTarget = new THREE.Vector3(0, 2, 0) // 初始化为默认目标点
 
+// 性能优化变量
+let lastTimeUpdate = 0
+let lastStatusUpdate = 0
+let frameCount = 0
+
 const wheelSetParams = reactive({
   axleLength: 1.435, // 标准轨距
   wheelRadius: 0.45, // 标准车轮半径
@@ -339,13 +567,24 @@ function initScene() {
     0.1,
     10000
   )
-  camera.position.set(-3, 5, -10) // 降低主视角相机高度
+  // 计算目标轮对位置（默认使用二轴左轮位置）
+  let targetPosition = new THREE.Vector3(0, 1, 0)
+  let targetQuaternion = new THREE.Quaternion(0, 0, 0, 1)
+  
+  // 如果轮对已初始化，使用实际位置
+  if (wheelSet) {
+    targetPosition.copy(wheelSet.position)
+    targetQuaternion.copy(wheelSet.quaternion)
+  }
+  
+  // 设置相机初始位置为二轴左轮视角
+  camera.position.set(targetPosition.x - 1.5, 3, targetPosition.z - 2)
   
   // 初始化相机目标位置
-  cameraTargetPosition.set(-3, 5, -10)
-  cameraTargetLookAt.set(0, 2, 0)
-  controlsTarget.set(0, 2, 0)
-  camera.lookAt(0, 0, 0)
+  cameraTargetPosition.set(targetPosition.x - 1.5, 3, targetPosition.z - 2)
+  cameraTargetLookAt.set(targetPosition.x, 0.5, targetPosition.z)
+  controlsTarget.set(targetPosition.x, 0.5, targetPosition.z)
+  camera.lookAt(targetPosition.x, 0.5, targetPosition.z)
   
   // 创建渲染器
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -386,6 +625,259 @@ function initScene() {
       setTrackPath(baseTrackPath)
     }
   }
+  
+  // 初始化编组视窗
+  initMarshallingView()
+}
+
+// 初始化编组视窗
+function initMarshallingView() {
+  console.log('尝试初始化编组视窗...')
+  
+  // 直接通过DOM查询获取编组容器
+  const container = document.querySelector('.marshalling-container')
+  if (!container) {
+    console.error('编组容器未找到！')
+    return
+  }
+  
+  console.log('找到编组容器:', container)
+  
+  // 清空现有内容
+  container.innerHTML = ''
+  
+  // 创建一个单一的画布，用于显示整个编组
+  const canvas = document.createElement('canvas')
+  canvas.width = 300
+  canvas.height = 180
+  canvas.style.width = '100%'
+  canvas.style.height = '100%'
+  container.appendChild(canvas)
+  
+  // 初始化整个编组场景
+  initMarshallingScene(canvas)
+  
+  console.log('编组视窗初始化完成')
+}
+
+// 初始化编组场景
+function initMarshallingScene(canvas) {
+  console.log('初始化编组场景...')
+  
+  // 创建场景
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0xb3d3ff) // 设置为b3d3ff背景色
+  
+  // 创建相机
+  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 1000)
+  camera.position.set(0, 1.5, 4) // 调整相机位置，使其更接近模型
+  camera.lookAt(0, 0, 0)
+  
+  // 创建渲染器
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true })
+  renderer.setSize(canvas.width, canvas.height)
+  
+  // 添加灯光
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0)
+  scene.add(ambientLight)
+  
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5)
+  directionalLight.position.set(1, 1, 2)
+  scene.add(directionalLight)
+  
+  const pointLight = new THREE.PointLight(0xffffff, 0.5)
+  pointLight.position.set(0, 1, 1)
+  scene.add(pointLight)
+  
+  // 列车编组配置：动车-拖车-拖车-拖车---动车
+  const trainConfig = [
+    { type: 'motor', name: '动车', modelPath: '/models_3d/gao.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'trailer', name: '拖车', modelPath: '/models_3d/tuo.glb' },
+    { type: 'motor', name: '动车', modelPath: '/models_3d/gao.glb' }
+  ]
+  
+  // 加载所有模型
+  let loadedModels = 0
+  
+  trainConfig.forEach((carConfig, index) => {
+    const loader = new GLTFLoader()
+    
+    loader.load(
+      carConfig.modelPath,
+      (gltf) => {
+        console.log(`模型加载成功: ${carConfig.modelPath}`)
+        
+        const model = gltf.scene
+        
+        // 计算模型边界框，以便正确定位
+        const box = new THREE.Box3().setFromObject(model)
+        const size = box.getSize(new THREE.Vector3())
+        const center = box.getCenter(new THREE.Vector3())
+        
+        console.log(`模型大小: ${size.x}, ${size.y}, ${size.z}`)
+        console.log(`模型中心: ${center.x}, ${center.y}, ${center.z}`)
+        
+        // 调整模型大小，确保它适合场景
+        const maxSize = Math.max(size.x, size.y, size.z)
+        const scaleFactor = 1.5 / maxSize // 调整缩放因子，使模型大小合适
+        model.scale.set(scaleFactor, scaleFactor, scaleFactor)
+        
+        // 重新计算边界框，获取缩放后的大小
+        box.setFromObject(model)
+        box.getCenter(center)
+        
+        // 调整模型位置，使其在场景中排列
+        const spacing = 1.5 // 减小车辆之间的间距
+        const carPositionX = (index - 3.5) * spacing // 居中排列8辆车
+        
+        // 调整模型位置，使其居中显示
+        model.position.set(carPositionX - center.x, -center.y, -center.z)
+        
+        // 绕自身垂直轴（Y轴）旋转
+        // 除最后一节车外，其余车保持原方向旋转90度，最后一节车向相反方向旋转90度
+        if (index === 7) { // 最后一节车（索引为7）
+          // 最后一节车：向相反方向旋转90度
+          model.rotation.y = -Math.PI / 2
+        } else {
+          // 其余车：保持原方向旋转90度
+          model.rotation.y = Math.PI / 2
+        }
+        
+        // 添加模型到场景
+        scene.add(model)
+        
+        loadedModels++
+        console.log(`已加载 ${loadedModels}/${trainConfig.length} 个模型`)
+        
+        // 当所有模型加载完成后，开始渲染
+        if (loadedModels === trainConfig.length) {
+          console.log('所有模型加载完成，开始渲染...')
+          animate()
+        }
+      },
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+      },
+      (error) => {
+        console.error('模型加载错误:', error)
+      }
+    )
+  })
+  
+  // 渲染场景
+  function animate() {
+    requestAnimationFrame(animate)
+    renderer.render(scene, camera)
+  }
+}
+
+
+
+// 渲染编组场景
+function animateMarshallingScene() {
+  if (!marshallingRenderer || !marshallingScene || !marshallingCamera) return
+  
+  marshallingRenderer.render(marshallingScene, marshallingCamera)
+  marshallingAnimationId = requestAnimationFrame(animateMarshallingScene)
+}
+
+// 加载模型到画布
+function loadModelToCanvas(canvas, carConfig) {
+  console.log(`加载模型到画布 ${canvas.dataset.carIndex}: ${carConfig.modelPath}`)
+  
+  // 创建场景
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x2a3b4c) // 使用深色背景，而不是纯黑色
+  
+  // 创建相机
+  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 1000)
+  camera.position.set(0, 0, 3) // 调整相机位置，使其更接近模型
+  
+  // 创建渲染器
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true })
+  renderer.setSize(canvas.width, canvas.height)
+  
+  // 添加灯光
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0) // 增加环境光亮度
+  scene.add(ambientLight)
+  
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5) // 增加方向光亮度
+  directionalLight.position.set(1, 1, 2) // 调整方向光位置
+  scene.add(directionalLight)
+  
+  // 添加额外的点光源，增强模型细节
+  const pointLight = new THREE.PointLight(0xffffff, 0.5)
+  pointLight.position.set(0, 1, 1)
+  scene.add(pointLight)
+  
+  // 加载模型
+  const loader = new GLTFLoader()
+  
+  loader.load(
+    carConfig.modelPath,
+    (gltf) => {
+      console.log(`模型加载成功: ${carConfig.modelPath}`)
+      
+      const model = gltf.scene
+      scene.add(model)
+      
+      // 计算模型边界框，以便正确定位
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const center = box.getCenter(new THREE.Vector3())
+      
+      console.log(`模型大小: ${size.x}, ${size.y}, ${size.z}`)
+      console.log(`模型中心: ${center.x}, ${center.y}, ${center.z}`)
+      
+      // 调整模型大小，确保它适合画布
+      const maxSize = Math.max(size.x, size.y, size.z)
+      const scaleFactor = 2 / maxSize // 调整缩放因子，使模型大小合适
+      model.scale.set(scaleFactor, scaleFactor, scaleFactor)
+      
+      // 重新计算边界框，获取缩放后的大小
+      box.setFromObject(model)
+      box.getCenter(center)
+      
+      // 调整模型位置，使其居中显示
+      model.position.set(-center.x, -center.y, -center.z)
+      
+      // 绕自身垂直轴（Y轴）旋转
+      // 除最后一节车外，其余车保持原方向旋转90度，最后一节车向相反方向旋转90度
+      const carIndex = parseInt(canvas.dataset.carIndex)
+      if (carIndex === 7) { // 最后一节车（索引为7）
+        // 最后一节车：向相反方向旋转90度
+        model.rotation.y = -Math.PI / 2
+      } else {
+        // 其余车：保持原方向旋转90度
+        model.rotation.y = Math.PI / 2
+      }
+      
+      // 渲染场景
+      function animate() {
+        requestAnimationFrame(animate)
+        renderer.render(scene, camera)
+      }
+      
+      animate()
+    },
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+    },
+    (error) => {
+      console.error('模型加载错误:', error)
+      // 显示错误信息
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '10px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('模型加载失败', canvas.width / 2, canvas.height / 2)
+    }
+  )
 }
 
 // 创建环境贴图
@@ -1665,7 +2157,8 @@ function updateGroundAndGrids() {
   // 更新地面块数组
   trackElements.ground = newGroundBlocks
   
-  // 更新网格线
+  // 更新网格线 - 已禁用
+  /*
   const newGrids = []
   
   // 计算需要创建的网格线数量
@@ -1709,6 +2202,13 @@ function updateGroundAndGrids() {
   
   // 更新网格线数组
   trackElements.grids = newGrids
+  */
+  
+  // 移除所有现有的网格线
+  trackElements.grids.forEach(grid => {
+    scene.remove(grid)
+  })
+  trackElements.grids = []
 }
 
 // 更新轮对参数
@@ -1742,6 +2242,18 @@ function updateWheelSet() {
 // 动画循环
 function animate() {
   animationId = requestAnimationFrame(animate)
+  
+  // 更新当前时间（每100ms更新一次，减少计算）
+  if (Date.now() - lastTimeUpdate > 100) {
+    updateCurrentTime()
+    lastTimeUpdate = Date.now()
+  }
+  
+  // 更新列车状态（每50ms更新一次，减少计算）
+  if (Date.now() - lastStatusUpdate > 50) {
+    updateTrainStatus()
+    lastStatusUpdate = Date.now()
+  }
   
   if (isAnimating.value) {
     progress.value += 0.0005 // 减慢轮对运行速度，从0.001改为0.0001
@@ -1863,21 +2375,42 @@ function animate() {
   controls.update()
   renderer.render(scene, camera)
   
-  // 更新轮轨接触点箭头位置
-  updateContactArrows()
+  // 更新轮轨接触点箭头位置（每2帧更新一次，减少计算）
+  if (frameCount % 2 === 0) {
+    updateContactArrows()
+  }
   
-  // 更新小地图
-  updateMinimap(camera, [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet].filter(Boolean))
+  // 更新小地图（每5帧更新一次，减少计算）
+  if (frameCount % 5 === 0) {
+    updateMinimap(camera, [wheelSet, secondWheelSet, thirdWheelSet, fourthWheelSet].filter(Boolean))
+  }
+  
+  frameCount++
 }
 
 // 开始运行
 function startAnimation() {
   isAnimating.value = true
+  
+  // 开始数据模拟
+  if (!simulationInterval) {
+    simulationInterval = dataSimulator.startSimulation(100, {
+      onWheelLoadReduction: handleWheelLoadReductionMessage,
+      onDerailmentCoefficient: handleDerailmentCoefficientMessage,
+      onWheelRailForce: handleWheelRailForceMessage
+    })
+  }
 }
 
 // 停止运行
 function stopAnimation() {
   isAnimating.value = false
+  
+  // 停止数据模拟
+  if (simulationInterval) {
+    clearInterval(simulationInterval)
+    simulationInterval = null
+  }
 }
 
 // 切换动画状态
@@ -1894,6 +2427,31 @@ function resetAnimation() {
   isAnimating.value = false
   progress.value = 0
   updateWheelSetPosition(0)
+  
+  // 停止数据模拟
+  if (simulationInterval) {
+    clearInterval(simulationInterval)
+    simulationInterval = null
+  }
+  
+  // 清空图表数据
+  wheelLoadReductionData.mileages = []
+  wheelLoadReductionData.leftReductionRates = []
+  wheelLoadReductionData.rightReductionRates = []
+  
+  derailmentCoefficientData.mileages = []
+  derailmentCoefficientData.leftCoefficients = []
+  derailmentCoefficientData.rightCoefficients = []
+  
+  wheelRailForceData.mileages = []
+  wheelRailForceData.verticalForces = []
+  wheelRailForceData.lateralForces = []
+  wheelRailForceData.longitudinalForces = []
+  
+  // 更新图表
+  updateWheelLoadReductionChart()
+  updateDerailmentCoefficientChart()
+  updateWheelRailForceChart()
 }
 
 // 切换轮轨力图表显示
@@ -1909,6 +2467,35 @@ function toggleWheelLoadReductionChart() {
 // 切换脱轨系数图表显示
 function toggleDerailmentCoefficientChart() {
   showDerailmentCoefficientChart.value = !showDerailmentCoefficientChart.value
+}
+
+// 切换运行轨迹视窗显示
+function toggleMinimap() {
+  showMinimap.value = !showMinimap.value
+  // 如果重新打开小地图，重新初始化
+  if (showMinimap.value) {
+    setTimeout(() => {
+      const minimapCanvas = document.getElementById('minimapCanvas')
+      if (minimapCanvas) {
+        initMinimap(minimapCanvas)
+        // 设置轨道路径
+        if (baseTrackPath) {
+          setTrackPath(baseTrackPath)
+        }
+      }
+    }, 0)
+  }
+}
+
+// 切换列车编组视窗显示
+function toggleMarshalling() {
+  showMarshalling.value = !showMarshalling.value
+  // 如果重新打开编组视窗，重新初始化
+  if (showMarshalling.value) {
+    setTimeout(() => {
+      initMarshallingView()
+    }, 0)
+  }
 }
 
 // 设置关注轮轴位置
@@ -2087,7 +2674,7 @@ function createContactArrows() {
   })
 }
 
-// 更新轮轨接触点箭头位置
+// 更新轮轨接触点箭头位置和长度
 function updateContactArrows() {
   if (contactArrows.length === 0) return
   
@@ -2096,6 +2683,16 @@ function updateContactArrows() {
   const wheelArrays = [wheels, secondWheels, thirdWheels, fourthWheels]
   
   let arrowIndex = 0
+  
+  // 获取最新的轮轨力数据
+  const latestForceIndex = wheelRailForceData.mileages.length - 1
+  const hasForceData = latestForceIndex >= 0
+  
+  // 力值缩放因子（调整箭头长度）
+  const forceScaleFactor = 0.0005
+  
+  // 基础箭头长度
+  const baseArrowLength = 0.2
   
   wheelSets.forEach((ws, wsIndex) => {
     if (!ws) return
@@ -2129,6 +2726,55 @@ function updateContactArrows() {
             contactPoint.z - 0.5 // 向后移动0.5单位距离
           )
           arrow.position.copy(arrowPosition)
+          
+          // 计算箭头长度（基于力数据或默认值，添加随机动态效果）
+          let baseScaledLength = baseArrowLength
+          if (hasForceData) {
+            let forceValue = 0
+            switch (i) {
+              case 0: // x轴方向（横向力）
+                forceValue = Math.abs(wheelRailForceData.lateralForces[latestForceIndex])
+                baseScaledLength = baseArrowLength + (forceValue * forceScaleFactor)
+                break
+              case 1: // y轴方向（垂向力）
+                forceValue = Math.abs(wheelRailForceData.verticalForces[latestForceIndex])
+                baseScaledLength = baseArrowLength + (forceValue * forceScaleFactor)
+                break
+              case 2: // z轴方向（纵向力）
+                forceValue = Math.abs(wheelRailForceData.longitudinalForces[latestForceIndex])
+                baseScaledLength = baseArrowLength + (forceValue * forceScaleFactor)
+                break
+            }
+          }
+          
+          // 添加随机动态效果到圆柱体（箭头杆）长度（仅当模拟运行时）
+          let scaledLength = baseScaledLength
+          try {
+            if (typeof isAnimating !== 'undefined' && isAnimating.value) {
+              const randomFactor = 0.8 + Math.random() * 0.4 // 0.8到1.2之间的随机因子
+              scaledLength = baseScaledLength * randomFactor
+            }
+          } catch (e) {
+            // 如果isAnimating不可用，不应用动态效果
+          }
+          
+          // 更新箭头
+          if (arrow.children.length > 0) {
+            // 更新圆柱体（箭头杆）长度
+            const cylinder = arrow.children[0]
+            if (cylinder) {
+              // 使用缩放而不是重新创建几何体，减少内存开销
+              cylinder.scale.y = scaledLength / 0.2 // 0.2是基础长度
+              cylinder.position.y = scaledLength / 2
+            }
+            
+            // 更新圆锥体（箭头头）位置
+            const cone = arrow.children[1]
+            if (cone) {
+              cone.position.y = scaledLength + 0.04
+            }
+          }
+          
           arrowIndex++
         }
       }
@@ -2167,24 +2813,11 @@ onMounted(() => {
   initDerailmentCoefficientChart()
   initWheelRailForceChart()
   
-  // 建立WebSocket连接
-  wheelLoadReductionWS = webSocketAPI.connectWheelLoadReduction(
-    handleWheelLoadReductionMessage,
-    (error) => console.error('轮重减载率WebSocket连接错误:', error),
-    () => console.log('轮重减载率WebSocket连接已关闭')
-  )
-  
-  derailmentCoefficientWS = webSocketAPI.connectDerailmentCoefficient(
-    handleDerailmentCoefficientMessage,
-    (error) => console.error('脱轨系数WebSocket连接错误:', error),
-    () => console.log('脱轨系数WebSocket连接已关闭')
-  )
-  
-  wheelRailForceWS = webSocketAPI.connectWheelRailForce(
-    handleWheelRailForceMessage,
-    (error) => console.error('轮轨力WebSocket连接错误:', error),
-    () => console.log('轮轨力WebSocket连接已关闭')
-  )
+  // 初始化编组视窗（延迟执行，确保DOM完全渲染）
+  setTimeout(() => {
+    console.log('延迟初始化编组视窗...')
+    initMarshallingView()
+  }, 500)
 })
 
 // 监听图表显示状态变化，重新初始化图表
@@ -2234,15 +2867,132 @@ onUnmounted(() => {
     renderer.dispose()
   }
   
+  // 清理编组场景资源
+  if (marshallingAnimationId) {
+    cancelAnimationFrame(marshallingAnimationId)
+  }
+  if (marshallingRenderer) {
+    marshallingRenderer.dispose()
+  }
+  if (marshallingScene) {
+    // 清理编组模型
+    marshallingModels.forEach(model => {
+      marshallingScene.remove(model)
+    })
+    marshallingModels = []
+  }
+  // 重置编组场景变量
+  marshallingScene = null
+  marshallingCamera = null
+  marshallingRenderer = null
+  marshallingAnimationId = null
+  
+  // 清理场景中的所有对象
+  if (scene) {
+    // 清理轮对
+    if (wheelSet) {
+      scene.remove(wheelSet)
+    }
+    if (secondWheelSet) {
+      scene.remove(secondWheelSet)
+    }
+    if (thirdWheelSet) {
+      scene.remove(thirdWheelSet)
+    }
+    if (fourthWheelSet) {
+      scene.remove(fourthWheelSet)
+    }
+    
+    // 清理转向架
+    if (bogie) {
+      scene.remove(bogie)
+      bogie = null
+    }
+    if (secondBogie) {
+      scene.remove(secondBogie)
+      secondBogie = null
+    }
+    
+    // 清理接触点箭头
+    contactArrows.forEach(arrow => {
+      scene.remove(arrow)
+    })
+    contactArrows = []
+    
+    // 清理轨道元素
+    trackElements.bases.forEach(base => scene.remove(base))
+    trackElements.sleepers.forEach(sleeper => scene.remove(sleeper))
+    trackElements.rails.forEach(rail => {
+      scene.remove(rail)
+      if (rail.geometry) rail.geometry.dispose()
+      if (rail.material) rail.material.dispose()
+    })
+    trackElements.ground.forEach(ground => scene.remove(ground))
+    trackElements.grids.forEach(grid => scene.remove(grid))
+    
+    // 重置轨道元素数组
+    trackElements = {
+      bases: [],
+      sleepers: [],
+      rails: [],
+      ground: [],
+      grids: []
+    }
+  }
+  
+  // 清理共享几何体和材质
+  for (const key in sharedGeometries) {
+    if (sharedGeometries[key]) {
+      sharedGeometries[key].dispose()
+    }
+  }
+  sharedGeometries = {
+    base: null,
+    block: null,
+    bar: null,
+    ground: null
+  }
+  
+  for (const key in sharedMaterials) {
+    if (sharedMaterials[key]) {
+      sharedMaterials[key].dispose()
+    }
+  }
+  sharedMaterials = {
+    base: null,
+    sleeper: null,
+    bar: null,
+    ground: null
+  }
+  
+  // 清理轮对和车轮数组
+  wheelSet = null
+  secondWheelSet = null
+  thirdWheelSet = null
+  fourthWheelSet = null
+  wheels = []
+  secondWheels = []
+  thirdWheels = []
+  fourthWheels = []
+  
+  // 清理轨道路径
+  baseTrackPath = null
+  leftTrackPath = null
+  rightTrackPath = null
+  
+  // 清理编组视窗资源
+  if (marshallingContainer.value) {
+    // 清空编组容器，触发画布的清理
+    marshallingContainer.value.innerHTML = ''
+  }
+  
   // 销毁图表
   wheelLoadReductionChart?.dispose()
   derailmentCoefficientChart?.dispose()
   wheelRailForceChart?.dispose()
   
-  // 关闭WebSocket连接
-  webSocketAPI.disconnect(wheelLoadReductionWS)
-  webSocketAPI.disconnect(derailmentCoefficientWS)
-  webSocketAPI.disconnect(wheelRailForceWS)
+  // 停止数据模拟
+  dataSimulator.stopSimulation(simulationInterval)
 })
 
 // 初始化轮重减载率曲线
@@ -2255,22 +3005,27 @@ const initWheelLoadReductionChart = () => {
     tooltip: {
       trigger: 'axis',
       formatter: function(params) {
+        if (!params || params.length === 0) return '';
         return `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>` +
-               `左侧轮重减载率: ${params[0].data.toFixed(3)}<br/>` +
-               `右侧轮重减载率: ${params[1].data.toFixed(3)}`;
+               `左侧轮重减载率: ${(params[0]?.data || 0).toFixed(3)}<br/>` +
+               `右侧轮重减载率: ${(params[1]?.data || 0).toFixed(3)}`;
       }
     },
     legend: {
       data: ['左侧轮重减载率', '右侧轮重减载率'],
       top: 10,
+      left: 'center',
       textStyle: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#fff'
       },
       selected: {
         '左侧轮重减载率': true,
         '右侧轮重减载率': false
-      }
+      },
+      itemWidth: 15,
+      itemHeight: 10,
+      itemGap: 20
     },
     grid: {
       left: '3%',
@@ -2395,44 +3150,32 @@ const updateWheelLoadReductionChart = () => {
     },
     series: [
       {
+        name: '左侧轮重减载率',
         data: wheelLoadReductionData.leftReductionRates
       },
       {
+        name: '右侧轮重减载率',
         data: wheelLoadReductionData.rightReductionRates
       }
     ]
   })
 }
 
-// 处理轮重减载率WebSocket消息
-const handleWheelLoadReductionMessage = (message) => {
-  if (message.type === 'historical_data') {
-    // 处理历史数据
-    const data = message.data;
-    wheelLoadReductionData.mileages = data.map(item => item.mileage);
-    wheelLoadReductionData.leftReductionRates = data.map(item => item.left);
-    wheelLoadReductionData.rightReductionRates = data.map(item => item.right);
-    updateWheelLoadReductionChart();
-  } else if (message.type === 'realtime_data') {
-    // 处理实时数据
-    const dataPoint = message.data;
-    
-    // 添加新数据点
-    wheelLoadReductionData.mileages.push(dataPoint.mileage);
-    wheelLoadReductionData.leftReductionRates.push(dataPoint.left);
-    wheelLoadReductionData.rightReductionRates.push(dataPoint.right);
-    
-    // 保持数据点在1000km范围内
-    if (wheelLoadReductionData.mileages.length > 0 && 
-        wheelLoadReductionData.mileages[wheelLoadReductionData.mileages.length - 1] - 
-        wheelLoadReductionData.mileages[0] > 1000000) {
-      wheelLoadReductionData.mileages.shift();
-      wheelLoadReductionData.leftReductionRates.shift();
-      wheelLoadReductionData.rightReductionRates.shift();
-    }
-    
-    updateWheelLoadReductionChart();
+// 处理轮重减载率数据消息
+const handleWheelLoadReductionMessage = (dataPoint) => {
+  // 直接使用模拟器生成的数据格式
+  wheelLoadReductionData.mileages.push(dataPoint.mileage);
+  wheelLoadReductionData.leftReductionRates.push(dataPoint.leftReductionRate);
+  wheelLoadReductionData.rightReductionRates.push(dataPoint.rightReductionRate);
+  
+  // 保持数据点在合理范围内
+  if (wheelLoadReductionData.mileages.length > 100) {
+    wheelLoadReductionData.mileages.shift();
+    wheelLoadReductionData.leftReductionRates.shift();
+    wheelLoadReductionData.rightReductionRates.shift();
   }
+  
+  updateWheelLoadReductionChart();
 }
 
 // 初始化脱轨系数曲线
@@ -2445,22 +3188,27 @@ const initDerailmentCoefficientChart = () => {
     tooltip: {
       trigger: 'axis',
       formatter: function(params) {
+        if (!params || params.length === 0) return '';
         return `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>` +
-               `左侧脱轨系数: ${params[0].data.toFixed(3)}<br/>` +
-               `右侧脱轨系数: ${params[1].data.toFixed(3)}`;
+               `左侧脱轨系数: ${(params[0]?.data || 0).toFixed(3)}<br/>` +
+               `右侧脱轨系数: ${(params[1]?.data || 0).toFixed(3)}`;
       }
     },
     legend: {
       data: ['左侧脱轨系数', '右侧脱轨系数'],
       top: 10,
+      left: 'center',
       textStyle: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#fff'
       },
       selected: {
         '左侧脱轨系数': true,
         '右侧脱轨系数': false
-      }
+      },
+      itemWidth: 15,
+      itemHeight: 10,
+      itemGap: 20
     },
     grid: {
       left: '3%',
@@ -2585,44 +3333,32 @@ const updateDerailmentCoefficientChart = () => {
     },
     series: [
       {
+        name: '左侧脱轨系数',
         data: derailmentCoefficientData.leftCoefficients
       },
       {
+        name: '右侧脱轨系数',
         data: derailmentCoefficientData.rightCoefficients
       }
     ]
   })
 }
 
-// 处理脱轨系数WebSocket消息
-const handleDerailmentCoefficientMessage = (message) => {
-  if (message.type === 'historical_data') {
-    // 处理历史数据
-    const data = message.data;
-    derailmentCoefficientData.mileages = data.map(item => item.mileage);
-    derailmentCoefficientData.leftCoefficients = data.map(item => item.left);
-    derailmentCoefficientData.rightCoefficients = data.map(item => item.right);
-    updateDerailmentCoefficientChart();
-  } else if (message.type === 'realtime_data') {
-    // 处理实时数据
-    const dataPoint = message.data;
-    
-    // 添加新数据点
-    derailmentCoefficientData.mileages.push(dataPoint.mileage);
-    derailmentCoefficientData.leftCoefficients.push(dataPoint.left);
-    derailmentCoefficientData.rightCoefficients.push(dataPoint.right);
-    
-    // 保持数据点在1000km范围内
-    if (derailmentCoefficientData.mileages.length > 0 && 
-        derailmentCoefficientData.mileages[derailmentCoefficientData.mileages.length - 1] - 
-        derailmentCoefficientData.mileages[0] > 1000000) {
-      derailmentCoefficientData.mileages.shift();
-      derailmentCoefficientData.leftCoefficients.shift();
-      derailmentCoefficientData.rightCoefficients.shift();
-    }
-    
-    updateDerailmentCoefficientChart();
+// 处理脱轨系数数据消息
+const handleDerailmentCoefficientMessage = (dataPoint) => {
+  // 直接使用模拟器生成的数据格式
+  derailmentCoefficientData.mileages.push(dataPoint.mileage);
+  derailmentCoefficientData.leftCoefficients.push(dataPoint.leftCoefficient);
+  derailmentCoefficientData.rightCoefficients.push(dataPoint.rightCoefficient);
+  
+  // 保持数据点在合理范围内
+  if (derailmentCoefficientData.mileages.length > 100) {
+    derailmentCoefficientData.mileages.shift();
+    derailmentCoefficientData.leftCoefficients.shift();
+    derailmentCoefficientData.rightCoefficients.shift();
   }
+  
+  updateDerailmentCoefficientChart();
 }
 
 // 初始化轮轨力曲线
@@ -2635,9 +3371,10 @@ const initWheelRailForceChart = () => {
     tooltip: {
       trigger: 'axis',
       formatter: function(params) {
+        if (!params || params.length === 0) return '';
         let result = `里程标: ${(params[0].axisValue / 1000).toFixed(2)}km<br/>`;
         params.forEach(param => {
-          result += `${param.seriesName}: ${param.data.toFixed(2)}kN<br/>`;
+          result += `${param.seriesName}: ${(param.data || 0).toFixed(2)}kN<br/>`;
         });
         return result;
       }
@@ -2645,15 +3382,19 @@ const initWheelRailForceChart = () => {
     legend: {
       data: ['轮轨垂向力', '轮轨横向力', '轮轨纵向力'],
       top: 10,
+      left: 'center',
       textStyle: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#fff'
       },
       selected: {
         '轮轨垂向力': true,
         '轮轨横向力': false,
         '轮轨纵向力': false
-      }
+      },
+      itemWidth: 15,
+      itemHeight: 10,
+      itemGap: 15
     },
     grid: {
       left: '3%',
@@ -2780,50 +3521,38 @@ const updateWheelRailForceChart = () => {
     },
     series: [
       {
+        name: '轮轨垂向力',
         data: wheelRailForceData.verticalForces
       },
       {
+        name: '轮轨横向力',
         data: wheelRailForceData.lateralForces
       },
       {
+        name: '轮轨纵向力',
         data: wheelRailForceData.longitudinalForces
       }
     ]
   })
 }
 
-// 处理轮轨力WebSocket消息
-const handleWheelRailForceMessage = (message) => {
-  if (message.type === 'historical_data') {
-    // 处理历史数据
-    const data = message.data;
-    wheelRailForceData.mileages = data.map(item => item.mileage);
-    wheelRailForceData.verticalForces = data.map(item => item.vertical);
-    wheelRailForceData.lateralForces = data.map(item => item.lateral);
-    wheelRailForceData.longitudinalForces = data.map(item => item.longitudinal);
-    updateWheelRailForceChart();
-  } else if (message.type === 'realtime_data') {
-    // 处理实时数据
-    const dataPoint = message.data;
-    
-    // 添加新数据点
-    wheelRailForceData.mileages.push(dataPoint.mileage);
-    wheelRailForceData.verticalForces.push(dataPoint.vertical);
-    wheelRailForceData.lateralForces.push(dataPoint.lateral);
-    wheelRailForceData.longitudinalForces.push(dataPoint.longitudinal);
-    
-    // 保持数据点在1000km范围内
-    if (wheelRailForceData.mileages.length > 0 && 
-        wheelRailForceData.mileages[wheelRailForceData.mileages.length - 1] - 
-        wheelRailForceData.mileages[0] > 1000000) {
-      wheelRailForceData.mileages.shift();
-      wheelRailForceData.verticalForces.shift();
-      wheelRailForceData.lateralForces.shift();
-      wheelRailForceData.longitudinalForces.shift();
-    }
-    
-    updateWheelRailForceChart();
+// 处理轮轨力数据消息
+const handleWheelRailForceMessage = (dataPoint) => {
+  // 直接使用模拟器生成的数据格式
+  wheelRailForceData.mileages.push(dataPoint.mileage);
+  wheelRailForceData.verticalForces.push(dataPoint.verticalForce);
+  wheelRailForceData.lateralForces.push(dataPoint.lateralForce);
+  wheelRailForceData.longitudinalForces.push(dataPoint.longitudinalForce);
+  
+  // 保持数据点在合理范围内
+  if (wheelRailForceData.mileages.length > 100) {
+    wheelRailForceData.mileages.shift();
+    wheelRailForceData.verticalForces.shift();
+    wheelRailForceData.lateralForces.shift();
+    wheelRailForceData.longitudinalForces.shift();
   }
+  
+  updateWheelRailForceChart();
 }
 </script>
 
@@ -2833,6 +3562,7 @@ const handleWheelRailForceMessage = (message) => {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .viewer-container {
@@ -2848,16 +3578,18 @@ const handleWheelRailForceMessage = (message) => {
   overflow: hidden;
 }
 
-/* 图表窗口样式 */
+/* 固定位置的曲线图窗 */
 .chart-windows {
   position: absolute;
   top: 80px;
   left: 270px;
-  right: 20px;
+  right: 500px;
+  bottom: 20px;
   z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 15px;
+  pointer-events: none;
 }
 
 .chart-controls {
@@ -2865,6 +3597,7 @@ const handleWheelRailForceMessage = (message) => {
   gap: 10px;
   justify-content: flex-start;
   margin-bottom: 5px;
+  pointer-events: auto;
 }
 
 .chart-controls .speed-button {
@@ -2873,19 +3606,22 @@ const handleWheelRailForceMessage = (message) => {
 }
 
 .chart-window-container {
-  display: flex;
-  gap: 20px;
-  justify-content: flex-start;
-  flex-wrap: wrap;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .chart-window {
+  position: absolute;
   background-color: rgba(0, 28, 78, 0.7);
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
   width: 280px;
   height: 190px;
+  z-index: 101;
+  pointer-events: auto;
 }
 
 .chart-window-header {
@@ -2893,6 +3629,16 @@ const handleWheelRailForceMessage = (message) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  cursor: move;
+  user-select: none;
+}
+
+.chart-window-header h4 {
+  cursor: move;
+}
+
+.chart-window-header .close-button {
+  cursor: pointer;
 }
 
 .chart-window h4 {
@@ -2967,6 +3713,12 @@ const handleWheelRailForceMessage = (message) => {
 
 .buttons-and-selector .el-button:hover {
   background-color: #0077d9;
+}
+
+.buttons-and-selector .el-button.active {
+  background-color: #0077d9;
+  box-shadow: 0 2px 4px rgba(0, 119, 217, 0.3);
+  font-weight: 600;
 }
 
 .view-selector {
@@ -3066,14 +3818,22 @@ const handleWheelRailForceMessage = (message) => {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   z-index: 100;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+}
+
+.minimap-fixed .window-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .minimap-fixed h4 {
   color: #fff;
-  margin-top: 0;
-  margin-bottom: 10px;
+  margin: 0;
   font-size: 14px;
   text-align: center;
+  flex: 1;
 }
 
 .minimap-fixed canvas {
@@ -3084,4 +3844,115 @@ const handleWheelRailForceMessage = (message) => {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* 固定位置的编组视窗 */
+.marshalling-fixed {
+  position: absolute;
+  top: 80px;
+  right: 180px;
+  background-color: rgba(10, 25, 47, 0.8);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 320px;
+  height: 254px;
+  display: block !important;
+  pointer-events: auto;
+}
+
+.marshalling-fixed .window-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.marshalling-fixed h4 {
+  color: #fff;
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+  flex: 1;
+}
+
+.marshalling-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #fff;
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.status-item {
+  flex: 1;
+  text-align: center;
+}
+
+.marshalling-container {
+  width: 100%;
+  height: calc(100% - 70px);
+  overflow: hidden; /* 隐藏滑动条 */
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 居中显示内容 */
+}
+
+
+
+.train-car {
+  min-width: 60px;
+  height: 120px;
+  margin: 0 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent; /* 隐藏文字 */
+  font-size: 12px;
+  font-weight: bold;
+  position: relative;
+  border: none; /* 移除边框 */
+  background: transparent; /* 透明背景 */
+  padding: 0; /* 移除内边距 */
+}
+
+.car-number {
+  display: none; /* 完全隐藏车厢编号和名称 */
+}
+
+.car-model {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-canvas {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+.train-car.motor {
+  background: transparent; /* 透明背景 */
+}
+
+.train-car.trailer {
+  background: transparent; /* 透明背景 */
+}
+
+.train-car::after {
+  display: none; /* 移除车厢之间的连接线 */
+}
+
+.train-car:last-child::after {
+  display: none;
+}
 </style>

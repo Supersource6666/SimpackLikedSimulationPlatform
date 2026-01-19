@@ -1,11 +1,11 @@
-# 轨道检查数据分析API文档
+# 轨道检查数据处理API文档
 
 ## 1. 概述
-本API文档描述了轨道检查数据分析系统中用于获取图表数据的接口，包含数据结构和使用示例。
+本API文档描述了轨道检查数据处理系统中用于获取图表数据的接口，包含数据结构和使用示例。
 
 ## 2. API服务模块
 
-### 2.1 数据分析API服务 (dataAnalysisAPI)
+### 2.1 数据处理API服务 (dataAnalysisAPI)
 
 **文件路径**: `src/services/dataAnalysisAPI.js`
 
@@ -67,7 +67,7 @@ dataAnalysisAPI.getAccelerationData()
 ]
 ```
 
-### 2.2 评估结果API服务 (evaluationResultsAPI)
+### 2.2 结果评估API服务 (evaluationResultsAPI)
 
 **文件路径**: `src/services/evaluationResultsAPI.js`
 

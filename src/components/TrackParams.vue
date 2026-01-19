@@ -1,5 +1,7 @@
 <template>
   <div class="track-params">
+    <h2>轨道动力学参数</h2>
+    <!-- todo:字体颜色设置为黑色 -->
     <!-- Tab切换 -->
     <div class="params-tabs">
       <div 

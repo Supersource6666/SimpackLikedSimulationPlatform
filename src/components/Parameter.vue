@@ -32,7 +32,7 @@
           v-if="activeTab === 'evaluationResults'" 
         />
         
-        <!-- 系统功能部分占位符 -->
+        <!-- 系统简介部分占位符 -->
         <div v-if="activeTab === 'settings'" class="placeholder-content">
           <h2>系统设置</h2>
           <p>此处将显示系统设置内容</p>

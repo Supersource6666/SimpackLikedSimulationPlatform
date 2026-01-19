@@ -35,7 +35,7 @@ async function request(url, options = {}) {
   }
 }
 
-// 数据分析相关API
+// 数据处理相关API
 export const dataAnalysisAPI = {
   // 获取速度-里程标曲线数据
   getSpeedData(params = {}) {
@@ -62,7 +62,7 @@ export const dataAnalysisAPI = {
   }
 };
 
-// 评估结果相关API
+// 结果评估相关API
 export const evaluationResultsAPI = {
   // 获取轮重减载率-里程标曲线数据
   getWheelLoadReductionData(params = {}) {

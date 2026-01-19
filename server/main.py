@@ -5,8 +5,8 @@ import asyncio
 from pydantic import BaseModel
 
 app = FastAPI(
-    title="轨道检查数据分析API",
-    description="提供轨道检查数据分析系统的后端API接口",
+    title="轨道检查数据处理API",
+    description="提供轨道检查数据处理系统的后端API接口",
     version="1.0.0"
 )
 
@@ -160,29 +160,29 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# 数据分析相关API
-@app.get("/api/data-analysis/speed", tags=["数据分析"])
+# 数据处理相关API
+@app.get("/api/data-analysis/speed", tags=["数据处理"])
 def get_speed_data():
     """获取速度-里程标曲线数据"""
     return generate_mock_data(base_value=100, variance=20, step=200)
 
-@app.get("/api/data-analysis/frame-acceleration", tags=["数据分析"])
+@app.get("/api/data-analysis/frame-acceleration", tags=["数据处理"])
 def get_frame_acceleration_data():
     """获取构架加速度-里程标曲线数据"""
     return generate_mock_data(base_value=0.5, variance=0.3, step=100)
 
-@app.get("/api/data-analysis/axial-acceleration", tags=["数据分析"])
+@app.get("/api/data-analysis/axial-acceleration", tags=["数据处理"])
 def get_axial_acceleration_data():
     """获取轴箱加速度-里程标曲线数据"""
     return generate_mock_data(base_value=0.2, variance=0.15, step=100)
 
-# 评估结果相关API
-@app.get("/api/evaluation-results/wheel-load-reduction", tags=["评估结果"])
+# 结果评估相关API
+@app.get("/api/evaluation-results/wheel-load-reduction", tags=["结果评估"])
 def get_wheel_load_reduction_data():
     """获取轮重减载率-里程标曲线数据"""
     return generate_mock_data_double(base_left=0.15, base_right=0.17, variance=0.05, step=100)
 
-@app.get("/api/evaluation-results/derailment-coefficient", tags=["评估结果"])
+@app.get("/api/evaluation-results/derailment-coefficient", tags=["结果评估"])
 def get_derailment_coefficient_data():
     """获取脱轨系数-里程标曲线数据"""
     return generate_mock_data_double(base_left=0.25, base_right=0.28, variance=0.08, step=100)
@@ -284,7 +284,7 @@ async def websocket_derailment_coefficient(websocket: WebSocket):
         print(f"WebSocket error: {e}")
         manager.disconnect(websocket)
 
-# 数据分析WebSocket端点
+# 数据处理WebSocket端点
 @app.websocket("/ws/data-analysis/speed")
 async def websocket_speed(websocket: WebSocket):
     """速度实时数据WebSocket"""

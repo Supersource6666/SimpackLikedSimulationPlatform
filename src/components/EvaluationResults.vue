@@ -1,6 +1,6 @@
 <template>
   <div class="evaluation-results-container">
-    <h2 class="page-title">评估结果</h2>
+    <h2 class="page-title">结果评估</h2>
     
     <!-- 图表容器 -->
     <div class="chart-container">
