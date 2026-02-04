@@ -167,10 +167,19 @@ const toggleGroup = (group) => {
 };
 
 const navigate = (path, tab) => {
-  if (tab) {
-    router.push({ path, query: { tab } });
+  if (path === currentRoute.value) {
+    // 当点击的是当前路径时，添加时间戳作为查询参数强制重新加载
+    if (tab) {
+      router.push({ path, query: { tab, t: Date.now() } });
+    } else {
+      router.push({ path, query: { t: Date.now() } });
+    }
   } else {
-    router.push(path);
+    if (tab) {
+      router.push({ path, query: { tab } });
+    } else {
+      router.push(path);
+    }
   }
 };
 

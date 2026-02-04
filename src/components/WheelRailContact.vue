@@ -110,6 +110,9 @@
                 速度：{{ currentSpeed.toFixed(1) }}km/h
               </button>
             </div>
+            <div class="status-item fps-display">
+              FPS：{{ fps.toFixed(1) }}
+            </div>
           </div>
         </div>      
       </div>
@@ -119,6 +122,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -129,6 +133,8 @@ import { createTrack as createManagerTrack, updateRailSegments, getTrackState } 
 import { createTrain, updateTrainPosition, getTrains, setTrackInfo } from '../utils/trainManager'
 import * as echarts from 'echarts'
 import { dataSimulator } from '../utils/dataSimulator'
+
+const route = useRoute()
 
 const canvasContainer = ref(null)
 const marshallingContainer = ref(null)
@@ -360,6 +366,40 @@ watch(currentView, (newView) => {
   switchView(newView)
 })
 
+// 监听路由参数变化，当时间戳参数变化时重置组件状态
+watch(() => route.query.t, (newTimestamp) => {
+  if (newTimestamp) {
+    // 重置动画状态
+    isAnimating.value = false
+    progress.value = 0
+    
+    // 重置图表数据
+    wheelLoadReductionData.mileages = []
+    wheelLoadReductionData.leftReductionRates = []
+    wheelLoadReductionData.rightReductionRates = []
+    
+    derailmentCoefficientData.mileages = []
+    derailmentCoefficientData.leftCoefficients = []
+    derailmentCoefficientData.rightCoefficients = []
+    
+    wheelRailForceData.mileages = []
+    wheelRailForceData.verticalForces = []
+    wheelRailForceData.lateralForces = []
+    wheelRailForceData.longitudinalForces = []
+    
+    speedData.mileages = []
+    speedData.speeds = []
+    
+    // 重新初始化图表
+    setTimeout(() => {
+      initWheelLoadReductionChart()
+      initDerailmentCoefficientChart()
+      initWheelRailForceChart()
+      initSpeedChart()
+    }, 100)
+  }
+})
+
 // 切换视角
 function switchView(viewType) {
   if (!camera || !controls) return
@@ -571,6 +611,13 @@ let sharedMaterials = {
   sleeper: null,
   bar: null
 }
+
+// 性能优化：减少轨道元素更新频率
+let lastTrackElementsUpdate = 0
+const trackElementsUpdateInterval = 100 // 每100ms更新一次轨道元素
+
+// 性能优化：跟踪最后一次视角
+let lastCameraView = 'main'
 let animationId
 let isAnimating = ref(false)
 let progress = ref(0)
@@ -584,6 +631,11 @@ let controlsTarget = new THREE.Vector3(0, 2, 0) // 初始化为默认目标点
 let lastTimeUpdate = 0
 let lastStatusUpdate = 0
 let frameCount = 0
+
+// FPS计算相关变量
+const fps = ref(0)
+let fpsFrameCount = 0
+let fpsLastTime = 0
 
 const wheelSetParams = reactive({
   axleLength: 1.435, // 标准轨距
@@ -866,6 +918,10 @@ function loadModelToCanvas(canvas, carConfig) {
   )
 }
 
+// 性能优化：减少环境贴图更新频率
+let lastEnvironmentMapUpdate = 0
+const environmentMapUpdateInterval = 200 // 每200ms更新一次环境贴图
+
 // 创建环境贴图
 function createEnvironmentMap() {
   // 创建一个简单的立方体环境贴图
@@ -881,9 +937,12 @@ function createEnvironmentMap() {
   // 在动画循环中更新环境贴图
   const originalAnimate = animate
   animate = function() {
-    if (wheelSet) {
+    // 性能优化：限制环境贴图更新频率
+    const currentTime = Date.now()
+    if (wheelSet && currentTime - lastEnvironmentMapUpdate >= environmentMapUpdateInterval) {
       cubeCamera.position.copy(wheelSet.position)
       cubeCamera.update(renderer, scene)
+      lastEnvironmentMapUpdate = currentTime
     }
     originalAnimate()
   }
@@ -1632,6 +1691,13 @@ function updateWheelSetPosition(progressValue) {
 function updateTrackElements() {
   if (!baseTrackPath || !camera) return
   
+  // 性能优化：限制更新频率
+  const currentTime = Date.now()
+  if (currentTime - lastTrackElementsUpdate < trackElementsUpdateInterval) {
+    return
+  }
+  lastTrackElementsUpdate = currentTime
+  
   // 可见区域范围（单位：米）
   const visibilityRange = 50 // 相机周围50米范围内的轨道元素可见
   
@@ -2239,6 +2305,15 @@ function animate() {
   if (Date.now() - lastStatusUpdate > 50) {
     updateTrainStatus()
     lastStatusUpdate = Date.now()
+  }
+  
+  // FPS计算
+  fpsFrameCount++
+  const currentTime = Date.now()
+  if (currentTime - fpsLastTime >= 1000) {
+    fps.value = (fpsFrameCount * 1000) / (currentTime - fpsLastTime)
+    fpsFrameCount = 0
+    fpsLastTime = currentTime
   }
   
   if (isAnimating.value) {
@@ -4052,6 +4127,17 @@ const updateSpeedChart = () => {
 
 .status-button:active {
   background-color: rgba(0, 99, 184, 1);
+}
+
+.fps-display {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: #4CAF50;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
 }
 
 .status-item {
